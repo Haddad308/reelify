@@ -99,7 +99,7 @@ function PreviewContent() {
                 poster={thumbnail || undefined}
                 controls
                 autoPlay
-                className="w-full h-full object-contain"
+                className="w-full h-full object-cover"
                 playsInline
               />
             </div>
