@@ -1,7 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import styles from "./page.module.css";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
 
 type ClipItem = {
   title: string;
@@ -17,6 +27,7 @@ export default function HomePage() {
   const [status, setStatus] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
+  const [step, setStep] = useState(1);
   const [platform, setPlatform] = useState("instagram");
   const [preferredDuration, setPreferredDuration] = useState(45);
   const [audience, setAudience] = useState("شباب 18-30");
@@ -53,16 +64,10 @@ export default function HomePage() {
 
     try {
       setIsLoading(true);
+      setStep(1);
       setStatus("جارٍ رفع الفيديو...");
       const formData = new FormData();
       formData.append("video", file);
-      formData.append("platform", platform);
-      formData.append("preferredDuration", String(preferredDuration));
-      formData.append("audience", audience);
-      formData.append("tone", tone);
-      formData.append("hookStyle", hookStyle);
-      formData.append("keyTopics", keyTopics.join(", "));
-      formData.append("callToAction", callToAction);
 
       setStatus("جارٍ معالجة الفيديو وتحليل المحتوى...");
       const response = await fetch("/api/process", {
@@ -88,219 +93,294 @@ export default function HomePage() {
   };
 
   return (
-    <main className={styles.page}>
-      <section className={styles.hero}>
-        <div>
-          <p className={styles.kicker}>Realify</p>
-          {/* <h1>حوّل فيديوك إلى مقاطع عربية قصيرة جاهزة للنشر</h1> */}
-          {/* <p className={styles.subtitle}>
-            ارفع الفيديو المحلي، وسيتم استخراج أفضل اللحظات تلقائيًا مع عناوين جذابة.
-          </p> */}
-        </div>
-        <form className={styles.card} onSubmit={onSubmit}>
-          {isLoading ? (
-            <div className={styles.formSection}>
-              <h2 className={styles.sectionTitle}>أثناء المعالجة، شارك تفضيلاتك</h2>
-              <p className={styles.helperText}>
-                إجاباتك تساعدنا في اختيار المقاطع والعناوين المناسبة.
-              </p>
-            </div>
-          ) : null}
-          <div className={styles.formSection}>
-            <h2 className={styles.sectionTitle}>تفضيلات المقاطع القصيرة</h2>
-            <div className={styles.fieldGroup}>
-              <label className={styles.label} htmlFor="platform">
-                على أي منصة ستنشر الفيديو؟
-              </label>
-              <select
-                id="platform"
-                className={styles.select}
-                value={platform}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setPlatform(value);
-                  void persistPreferences({ platform: value });
-                }}
-              >
-                <option value="instagram">إنستغرام ريلز</option>
-                <option value="tiktok">تيك توك</option>
-                <option value="youtube">يوتيوب شورتس</option>
-                <option value="snapchat">سناب شات سبوتلايت</option>
-                <option value="facebook">فيسبوك ريلز</option>
-              </select>
-            </div>
-            <div className={styles.fieldGroup}>
-              <label className={styles.label} htmlFor="preferredDuration">
-                ما المدة المفضلة للمقطع؟ (30-90 ثانية)
-              </label>
-              <select
-                id="preferredDuration"
-                className={styles.select}
-                value={preferredDuration}
-                onChange={(event) => {
-                  const value = Number(event.target.value);
-                  setPreferredDuration(value);
-                  void persistPreferences({ preferredDuration: value });
-                }}
-              >
-                <option value={30}>30 ثانية</option>
-                <option value={45}>45 ثانية</option>
-                <option value={60}>60 ثانية</option>
-                <option value={75}>75 ثانية</option>
-                <option value={90}>90 ثانية</option>
-              </select>
-            </div>
-            <div className={styles.fieldGroup}>
-              <label className={styles.label} htmlFor="audience">
-                من هو الجمهور المستهدف؟
-              </label>
-              <select
-                id="audience"
-                className={styles.select}
-                value={audience}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setAudience(value);
-                  void persistPreferences({ audience: value });
-                }}
-              >
-                <option value="شباب 18-30">شباب 18-30</option>
-                <option value="رواد أعمال">رواد أعمال</option>
-                <option value="مهتمون بالتطوير الذاتي">مهتمون بالتطوير الذاتي</option>
-                <option value="طلاب جامعات">طلاب جامعات</option>
-                <option value="مهنيون في التقنية">مهنيون في التقنية</option>
-              </select>
-            </div>
-            <div className={styles.fieldGroup}>
-              <label className={styles.label} htmlFor="tone">
-                ما النبرة الأنسب للمقطع؟
-              </label>
-              <select
-                id="tone"
-                className={styles.select}
-                value={tone}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setTone(value);
-                  void persistPreferences({ tone: value });
-                }}
-              >
-                <option value="ملهم">ملهم</option>
-                <option value="تعليمي">تعليمي</option>
-                <option value="حماسي">حماسي</option>
-                <option value="هادئ">هادئ</option>
-                <option value="عملي">عملي ومباشر</option>
-              </select>
-            </div>
-            <div className={styles.fieldGroup}>
-              <label className={styles.label} htmlFor="hookStyle">
-                أسلوب الافتتاح (الهوك)؟
-              </label>
-              <select
-                id="hookStyle"
-                className={styles.select}
-                value={hookStyle}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setHookStyle(value);
-                  void persistPreferences({ hookStyle: value });
-                }}
-              >
-                <option value="سؤال مباشر">سؤال مباشر</option>
-                <option value="رقم قوي">رقم قوي أو إحصائية</option>
-                <option value="وعد سريع">وعد بنتيجة سريعة</option>
-                <option value="قصة قصيرة">قصة قصيرة</option>
-                <option value="تنبيه أو تحذير">تنبيه أو تحذير</option>
-              </select>
-            </div>
-            <div className={styles.fieldGroup}>
-              <label className={styles.label} htmlFor="keyTopics">
-                ما أهم المحاور التي تريد التركيز عليها؟
-              </label>
-              <select
-                id="keyTopics"
-                className={styles.multiSelect}
-                multiple
-                value={keyTopics}
-                onChange={(event) => {
-                  const values = Array.from(event.target.selectedOptions).map(
-                    (option) => option.value
-                  );
-                  setKeyTopics(values);
-                  void persistPreferences({ keyTopics: values.join(", ") });
-                }}
-              >
-                <option value="التحفيز الذاتي">التحفيز الذاتي</option>
-                <option value="إدارة الوقت">إدارة الوقت</option>
-                <option value="التركيز والإنتاجية">التركيز والإنتاجية</option>
-                <option value="القيادة والعمل الجماعي">القيادة والعمل الجماعي</option>
-                <option value="التجارب والقصص الواقعية">التجارب والقصص الواقعية</option>
-                <option value="النصائح العملية">النصائح العملية</option>
-                <option value="التسويق والمبيعات">التسويق والمبيعات</option>
-                <option value="الصحة النفسية">الصحة النفسية</option>
-              </select>
-            </div>
-            <div className={styles.fieldGroup}>
-              <label className={styles.label} htmlFor="callToAction">
-                هل تريد دعوة للفعل محددة؟
-              </label>
-              <select
-                id="callToAction"
-                className={styles.select}
-                value={callToAction}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setCallToAction(value);
-                  void persistPreferences({ callToAction: value });
-                }}
-              >
-                <option value="شارك مع صديق">شارك مع صديق</option>
-                <option value="احفظ المقطع للعودة له">احفظ المقطع للعودة له</option>
-                <option value="اكتب رأيك في التعليقات">اكتب رأيك في التعليقات</option>
-                <option value="تابعنا للمزيد">تابعنا للمزيد</option>
-                <option value="طبّق النصيحة اليوم">طبّق النصيحة اليوم</option>
-              </select>
-            </div>
-          </div>
-          <label className={styles.label} htmlFor="video">
-            اختر فيديو من جهازك
-          </label>
-          <input
-            id="video"
-            type="file"
-            accept="video/*"
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-            className={styles.input}
-          />
-          <button className={styles.button} type="submit" disabled={!file || isLoading}>
-            {isLoading ? "جارٍ المعالجة..." : "ابدأ التحويل"}
-          </button>
-          {status ? <p className={styles.status}>{status}</p> : null}
-          {error ? <p className={styles.error}>{error}</p> : null}
-        </form>
-      </section>
+    <main className="min-h-screen bg-background text-foreground">
+      <section className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 pb-20 pt-12">
+        <header className="flex flex-col gap-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.4em] text-primary">
+            Realify
+          </p>
+          <h1 className="text-3xl font-semibold leading-snug">
+            اصنع ريلز عربية دقيقة خلال دقائق
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            ارفع الفيديو أولاً، وخلال المعالجة أجب عن أسئلة قصيرة لالتقاط أفضل المقاطع.
+          </p>
+        </header>
 
-      <section className={styles.results}>
-        <h2>المقاطع الجاهزة</h2>
-        {clips.length === 0 && !isLoading ? (
-          <p className={styles.empty}>لم يتم إنشاء أي مقاطع بعد.</p>
-        ) : (
-          <div className={styles.grid}>
-            {clips.map((clip) => (
-              <article key={clip.url} className={styles.clipCard}>
-                <div>
-                  <h3>{clip.title}</h3>
-                  <p className={styles.meta}>
-                    المدة: {Math.round(clip.duration)} ثانية
-                  </p>
+        <Card>
+          <CardHeader>
+            <CardTitle>ارفع الفيديو</CardTitle>
+            <CardDescription>ابدأ برفع الفيديو المحلي ثم انتقل للأسئلة.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form className="flex flex-col gap-4" onSubmit={onSubmit}>
+              <input
+                id="video"
+                type="file"
+                accept="video/*"
+                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                className="file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-semibold file:text-primary-foreground file:transition hover:file:opacity-90"
+              />
+              <Button type="submit" disabled={!file || isLoading}>
+                {isLoading ? "جارٍ المعالجة..." : "ابدأ التحويل"}
+              </Button>
+              {status ? <p className="text-sm text-primary">{status}</p> : null}
+              {error ? <p className="text-sm text-destructive">{error}</p> : null}
+            </form>
+          </CardContent>
+        </Card>
+
+        {isLoading ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>إجابات سريعة أثناء المعالجة</CardTitle>
+              <CardDescription>
+                اختر الإجابات المناسبة لتحسين انتقاء المقاطع والعناوين.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <span>الخطوة {step} من 3</span>
+                  <span>{Math.round((step / 3) * 100)}%</span>
                 </div>
-                <a className={styles.link} href={clip.url} download>
-                  تحميل المقطع
-                </a>
-              </article>
-            ))}
-          </div>
-        )}
+                <Progress value={(step / 3) * 100} />
+              </div>
+
+              {step === 1 ? (
+                <div className="space-y-5">
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      على أي منصة ستنشر الفيديو؟
+                    </p>
+                    <Select
+                      value={platform}
+                      onValueChange={(value) => {
+                        setPlatform(value);
+                        void persistPreferences({ platform: value });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="اختر المنصة" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="instagram">إنستغرام ريلز</SelectItem>
+                        <SelectItem value="tiktok">تيك توك</SelectItem>
+                        <SelectItem value="youtube">يوتيوب شورتس</SelectItem>
+                        <SelectItem value="snapchat">سناب شات سبوتلايت</SelectItem>
+                        <SelectItem value="facebook">فيسبوك ريلز</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      ما المدة المفضلة للمقطع؟ (30-90 ثانية)
+                    </p>
+                    <Select
+                      value={String(preferredDuration)}
+                      onValueChange={(value) => {
+                        const duration = Number(value);
+                        setPreferredDuration(duration);
+                        void persistPreferences({ preferredDuration: duration });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="اختر المدة" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="30">30 ثانية</SelectItem>
+                        <SelectItem value="45">45 ثانية</SelectItem>
+                        <SelectItem value="60">60 ثانية</SelectItem>
+                        <SelectItem value="75">75 ثانية</SelectItem>
+                        <SelectItem value="90">90 ثانية</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              ) : null}
+
+              {step === 2 ? (
+                <div className="space-y-5">
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">من هو الجمهور المستهدف؟</p>
+                    <Select
+                      value={audience}
+                      onValueChange={(value) => {
+                        setAudience(value);
+                        void persistPreferences({ audience: value });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="اختر الجمهور" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="شباب 18-30">شباب 18-30</SelectItem>
+                        <SelectItem value="رواد أعمال">رواد أعمال</SelectItem>
+                        <SelectItem value="مهتمون بالتطوير الذاتي">
+                          مهتمون بالتطوير الذاتي
+                        </SelectItem>
+                        <SelectItem value="طلاب جامعات">طلاب جامعات</SelectItem>
+                        <SelectItem value="مهنيون في التقنية">مهنيون في التقنية</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">ما النبرة الأنسب للمقطع؟</p>
+                    <Select
+                      value={tone}
+                      onValueChange={(value) => {
+                        setTone(value);
+                        void persistPreferences({ tone: value });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="اختر النبرة" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ملهم">ملهم</SelectItem>
+                        <SelectItem value="تعليمي">تعليمي</SelectItem>
+                        <SelectItem value="حماسي">حماسي</SelectItem>
+                        <SelectItem value="هادئ">هادئ</SelectItem>
+                        <SelectItem value="عملي">عملي ومباشر</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              ) : null}
+
+              {step === 3 ? (
+                <div className="space-y-5">
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">أسلوب الافتتاح (الهوك)؟</p>
+                    <Select
+                      value={hookStyle}
+                      onValueChange={(value) => {
+                        setHookStyle(value);
+                        void persistPreferences({ hookStyle: value });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="اختر الأسلوب" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="سؤال مباشر">سؤال مباشر</SelectItem>
+                        <SelectItem value="رقم قوي">رقم قوي أو إحصائية</SelectItem>
+                        <SelectItem value="وعد سريع">وعد بنتيجة سريعة</SelectItem>
+                        <SelectItem value="قصة قصيرة">قصة قصيرة</SelectItem>
+                        <SelectItem value="تنبيه أو تحذير">تنبيه أو تحذير</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      ما أهم المحاور التي تريد التركيز عليها؟
+                    </p>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      {[
+                        "التحفيز الذاتي",
+                        "إدارة الوقت",
+                        "التركيز والإنتاجية",
+                        "القيادة والعمل الجماعي",
+                        "التجارب والقصص الواقعية",
+                        "النصائح العملية",
+                        "التسويق والمبيعات",
+                        "الصحة النفسية"
+                      ].map((topic) => (
+                        <label
+                          key={topic}
+                          className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm"
+                        >
+                          <Checkbox
+                            checked={keyTopics.includes(topic)}
+                            onCheckedChange={(checked) => {
+                              const next = checked === true
+                                ? [...keyTopics, topic]
+                                : keyTopics.filter((item) => item !== topic);
+                              setKeyTopics(next);
+                              void persistPreferences({ keyTopics: next.join(", ") });
+                            }}
+                          />
+                          <span>{topic}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">هل تريد دعوة للفعل محددة؟</p>
+                    <Select
+                      value={callToAction}
+                      onValueChange={(value) => {
+                        setCallToAction(value);
+                        void persistPreferences({ callToAction: value });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="اختر دعوة للفعل" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="شارك مع صديق">شارك مع صديق</SelectItem>
+                        <SelectItem value="احفظ المقطع للعودة له">
+                          احفظ المقطع للعودة له
+                        </SelectItem>
+                        <SelectItem value="اكتب رأيك في التعليقات">
+                          اكتب رأيك في التعليقات
+                        </SelectItem>
+                        <SelectItem value="تابعنا للمزيد">تابعنا للمزيد</SelectItem>
+                        <SelectItem value="طبّق النصيحة اليوم">طبّق النصيحة اليوم</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="flex items-center justify-between">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={step === 1}
+                  onClick={() => setStep((current) => Math.max(1, current - 1))}
+                >
+                  السابق
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={step === 3}
+                  onClick={() => setStep((current) => Math.min(3, current + 1))}
+                >
+                  التالي
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        <section className="space-y-4">
+          <h2 className="text-xl font-semibold">المقاطع الجاهزة</h2>
+          {clips.length === 0 && !isLoading ? (
+            <p className="text-sm text-muted-foreground">لم يتم إنشاء أي مقاطع بعد.</p>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {clips.map((clip) => (
+                <Card key={clip.url}>
+                  <CardHeader>
+                    <CardTitle className="text-base">{clip.title}</CardTitle>
+                    <CardDescription>
+                      المدة: {Math.round(clip.duration)} ثانية
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button asChild>
+                      <a href={clip.url} download>
+                        تحميل المقطع
+                      </a>
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </section>
       </section>
     </main>
   );

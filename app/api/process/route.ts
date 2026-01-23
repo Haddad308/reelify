@@ -112,11 +112,12 @@ export async function POST(request: Request) {
       callToAction: upload.fields.callToAction || undefined
     };
 
-    const storedPreferences = await loadPreferences();
-    const mergedPreferences = await savePreferences({
-      ...storedPreferences,
-      ...preferenceUpdate
-    });
+    const hasUpdate = Object.values(preferenceUpdate).some(
+      (value) => value !== undefined && value !== ""
+    );
+    const mergedPreferences = hasUpdate
+      ? await savePreferences(preferenceUpdate)
+      : await loadPreferences();
 
     const clipCandidates = await generateClipCandidates(segments, mergedPreferences);
     if (clipCandidates.length === 0) {
