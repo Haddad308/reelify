@@ -89,20 +89,22 @@ function PreviewContent() {
 
   return (
     <div className="min-h-screen bg-gradient-warm py-10 px-4" dir="rtl">
-      <div className="max-w-5xl mx-auto space-y-8">
-        {/* Video Player */}
-        <Card className="shadow-card border-0 bg-gradient-card overflow-hidden animate-fade-in hover:shadow-card-hover transition-all duration-500">
-          <div className="aspect-video bg-gray-900 relative">
-            <video
-              src={url}
-              poster={thumbnail || undefined}
-              controls
-              autoPlay
-              className="w-full h-full object-contain"
-              playsInline
-            />
-          </div>
-        </Card>
+      <div className="max-w-4xl mx-auto space-y-8">
+        {/* Video Player - 9:16 Vertical Format */}
+        <div className="flex justify-center">
+          <Card className="shadow-card border-0 bg-gradient-card overflow-hidden animate-fade-in hover:shadow-card-hover transition-all duration-500 w-full max-w-md">
+            <div className="aspect-[9/16] bg-gray-900 relative">
+              <video
+                src={url}
+                poster={thumbnail || undefined}
+                controls
+                autoPlay
+                className="w-full h-full object-contain"
+                playsInline
+              />
+            </div>
+          </Card>
+        </div>
 
         {/* Video Info */}
         <Card className="shadow-card border-0 bg-gradient-card animate-fade-in" style={{ animationDelay: "0.1s" }}>
