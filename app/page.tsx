@@ -74,6 +74,7 @@ export default function HomePage() {
       if (!file) {
         throw new Error("يرجى رفع الفيديو أولاً.");
       }
+      setError("");
       setScreen("loading");
       setIsProcessing(true);
       setStatus("نجهّز الصوت للتفريغ...");
@@ -140,7 +141,15 @@ export default function HomePage() {
       setStatus("");
       setScreen("results");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "تعذر إكمال المعالجة.";
+      console.error("Processing error:", err);
+      let message = "تعذر إكمال المعالجة.";
+      if (err instanceof Error) {
+        message = err.message;
+      } else if (typeof err === "string") {
+        message = err;
+      } else if (err && typeof err === "object" && "message" in err) {
+        message = String((err as { message: unknown }).message);
+      }
       setError(message);
       setStatus("");
       setScreen("form");
@@ -202,6 +211,7 @@ export default function HomePage() {
                 </div>
                 <Progress value={(step / 3) * 100} />
               </div>
+              {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
               {step === 1 ? (
                 <div className="space-y-5">

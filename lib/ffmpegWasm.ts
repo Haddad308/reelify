@@ -1,9 +1,7 @@
-import { fetchFile, toBlobURL } from "@ffmpeg/util";
+import { fetchFile } from "@ffmpeg/util";
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 
 let ffmpegPromise: Promise<FFmpeg> | null = null;
-
-const CORE_BASE_URL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
 
 export async function getFfmpeg(): Promise<FFmpeg> {
   if (ffmpegPromise) {
@@ -12,9 +10,8 @@ export async function getFfmpeg(): Promise<FFmpeg> {
 
   ffmpegPromise = (async () => {
     const ffmpeg = new FFmpeg();
-    const coreURL = await toBlobURL(`${CORE_BASE_URL}/ffmpeg-core.js`, "text/javascript");
-    const wasmURL = await toBlobURL(`${CORE_BASE_URL}/ffmpeg-core.wasm`, "application/wasm");
-    await ffmpeg.load({ coreURL, wasmURL });
+    // Let the library use its default URLs from unpkg
+    await ffmpeg.load();
     return ffmpeg;
   })();
 
@@ -39,7 +36,9 @@ export async function extractAudioWav(ffmpeg: FFmpeg, inputName: string, outputN
     outputName
   ]);
   const audioData = await ffmpeg.readFile(outputName);
-  return new Blob([audioData], { type: "audio/wav" });
+  const audioBytes = typeof audioData === "string" ? new TextEncoder().encode(audioData) : audioData;
+  const audioBlobPart = audioBytes as BlobPart;
+  return new Blob([audioBlobPart], { type: "audio/wav" });
 }
 
 export async function clipVideoSegment(
@@ -69,5 +68,7 @@ export async function clipVideoSegment(
     outputName
   ]);
   const clipData = await ffmpeg.readFile(outputName);
-  return new Blob([clipData], { type: "video/mp4" });
+  const clipBytes = typeof clipData === "string" ? new TextEncoder().encode(clipData) : clipData;
+  const clipBlobPart = clipBytes as BlobPart;
+  return new Blob([clipBlobPart], { type: "video/mp4" });
 }
