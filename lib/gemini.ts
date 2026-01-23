@@ -2,7 +2,6 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { TranscriptSegment } from "./elevenlabs";
 import type { QAPreferences } from "./qaStore";
 
-// ClipCandidate is a type that represents a candidate for a clip
 export type ClipCandidate = {
   title: string;
   start: number;
