@@ -334,22 +334,26 @@ export default function HomePage() {
               ) : null}
 
               <div className="flex items-center justify-between">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={step === 1}
-                  onClick={() => setStep((current) => Math.max(1, current - 1))}
-                >
-                  السابق
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={step === 3}
-                  onClick={() => setStep((current) => Math.min(3, current + 1))}
-                >
-                  التالي
-                </Button>
+                {step > 1 ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setStep((current) => Math.max(1, current - 1))}
+                  >
+                    السابق
+                  </Button>
+                ) : (
+                  <span />
+                )}
+                {step < 3 ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => setStep((current) => Math.min(3, current + 1))}
+                  >
+                    التالي
+                  </Button>
+                ) : null}
               </div>
             </CardContent>
           </Card>
