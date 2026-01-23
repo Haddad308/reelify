@@ -10,6 +10,7 @@ function PreviewContent() {
   const url = searchParams.get("url");
   const title = searchParams.get("title") || "مقطع فيديو";
   const duration = searchParams.get("duration");
+  const thumbnail = searchParams.get("thumbnail");
 
   if (!url) {
     return (
@@ -57,6 +58,7 @@ function PreviewContent() {
           <div className="aspect-video bg-black rounded-lg overflow-hidden">
             <video
               src={url}
+              poster={thumbnail || undefined}
               controls
               autoPlay
               className="w-full h-full object-contain"

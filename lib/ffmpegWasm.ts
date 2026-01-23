@@ -22,6 +22,15 @@ export async function writeInputFile(ffmpeg: FFmpeg, name: string, file: File) {
   await ffmpeg.writeFile(name, await fetchFile(file));
 }
 
+// Helper to safely delete a file from FFmpeg's virtual filesystem
+async function deleteFile(ffmpeg: FFmpeg, name: string) {
+  try {
+    await ffmpeg.deleteFile(name);
+  } catch {
+    // Ignore errors if file doesn't exist
+  }
+}
+
 export async function extractAudioWav(ffmpeg: FFmpeg, inputName: string, outputName: string) {
   await ffmpeg.exec([
     "-i",
@@ -36,6 +45,7 @@ export async function extractAudioWav(ffmpeg: FFmpeg, inputName: string, outputN
     outputName
   ]);
   const audioData = await ffmpeg.readFile(outputName);
+  await deleteFile(ffmpeg, outputName); // Free memory
   const audioBytes = typeof audioData === "string" ? new TextEncoder().encode(audioData) : audioData;
   const audioBlobPart = audioBytes as BlobPart;
   return new Blob([audioBlobPart], { type: "audio/wav" });
@@ -50,25 +60,58 @@ export async function clipVideoSegment(
 ) {
   const safeStart = Math.max(0, start);
   const safeEnd = Math.max(safeStart, end);
+  const duration = safeEnd - safeStart;
+
+  // Use stream copy (-c copy) for faster processing and less memory usage
+  // Only re-encode if necessary
   await ffmpeg.exec([
     "-ss",
     safeStart.toFixed(3),
-    "-to",
-    safeEnd.toFixed(3),
     "-i",
     inputName,
-    "-c:v",
-    "libx264",
-    "-preset",
-    "veryfast",
-    "-c:a",
-    "aac",
-    "-movflags",
-    "+faststart",
+    "-t",
+    duration.toFixed(3),
+    "-c",
+    "copy",
+    "-avoid_negative_ts",
+    "make_zero",
     outputName
   ]);
   const clipData = await ffmpeg.readFile(outputName);
+  await deleteFile(ffmpeg, outputName); // Free memory
   const clipBytes = typeof clipData === "string" ? new TextEncoder().encode(clipData) : clipData;
   const clipBlobPart = clipBytes as BlobPart;
   return new Blob([clipBlobPart], { type: "video/mp4" });
+}
+
+export async function extractThumbnail(
+  ffmpeg: FFmpeg,
+  inputName: string,
+  outputName: string,
+  timestamp: number
+) {
+  const safeTimestamp = Math.max(0, timestamp);
+  await ffmpeg.exec([
+    "-ss",
+    safeTimestamp.toFixed(3),
+    "-i",
+    inputName,
+    "-frames:v",
+    "1",
+    "-q:v",
+    "5",
+    "-vf",
+    "scale=640:-1",
+    outputName
+  ]);
+  const thumbData = await ffmpeg.readFile(outputName);
+  await deleteFile(ffmpeg, outputName); // Free memory
+  const thumbBytes = typeof thumbData === "string" ? new TextEncoder().encode(thumbData) : thumbData;
+  const thumbBlobPart = thumbBytes as BlobPart;
+  return new Blob([thumbBlobPart], { type: "image/jpeg" });
+}
+
+// Clean up input file after all processing is done
+export async function cleanupInputFile(ffmpeg: FFmpeg, inputName: string) {
+  await deleteFile(ffmpeg, inputName);
 }

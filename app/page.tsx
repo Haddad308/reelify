@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { upload } from "@vercel/blob/client";
-import { getFfmpeg, writeInputFile, extractAudioWav, clipVideoSegment } from "@/lib/ffmpegWasm";
+import { getFfmpeg, writeInputFile, extractAudioWav, clipVideoSegment, extractThumbnail, cleanupInputFile } from "@/lib/ffmpegWasm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -21,6 +21,7 @@ type ClipItem = {
   url: string;
   start: number;
   end: number;
+  thumbnail: string;
 };
 
 export default function HomePage() {
@@ -116,7 +117,11 @@ export default function HomePage() {
       const uploadedClips: ClipItem[] = [];
 
       for (const candidate of candidates) {
-        const clipName = `clip-${crypto.randomUUID()}.mp4`;
+        const clipId = crypto.randomUUID();
+        const clipName = `clip-${clipId}.mp4`;
+        const thumbName = `thumb-${clipId}.jpg`;
+
+        // Extract video clip
         const clipBlob = await clipVideoSegment(
           ffmpeg,
           inputName,
@@ -125,9 +130,24 @@ export default function HomePage() {
           candidate.end
         );
 
+        // Extract thumbnail from first frame
+        const thumbBlob = await extractThumbnail(
+          ffmpeg,
+          inputName,
+          thumbName,
+          candidate.start
+        );
+
         // Upload clip to Vercel Blob
         const clipFile = new File([clipBlob], clipName, { type: "video/mp4" });
         const clipUpload = await upload(clipFile.name, clipFile, {
+          access: "public",
+          handleUploadUrl: "/api/upload",
+        });
+
+        // Upload thumbnail to Vercel Blob
+        const thumbFile = new File([thumbBlob], thumbName, { type: "image/jpeg" });
+        const thumbUpload = await upload(thumbFile.name, thumbFile, {
           access: "public",
           handleUploadUrl: "/api/upload",
         });
@@ -139,8 +159,12 @@ export default function HomePage() {
           end: candidate.end,
           duration,
           url: clipUpload.url,
+          thumbnail: thumbUpload.url,
         });
       }
+
+      // Clean up input file to free memory
+      await cleanupInputFile(ffmpeg, inputName);
 
       setClips(uploadedClips);
       setStatus("");
@@ -459,10 +483,17 @@ export default function HomePage() {
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {clips.map((clip) => {
-                  const previewUrl = `/preview?url=${encodeURIComponent(clip.url)}&title=${encodeURIComponent(clip.title)}&duration=${Math.round(clip.duration)}`;
+                  const previewUrl = `/preview?url=${encodeURIComponent(clip.url)}&title=${encodeURIComponent(clip.title)}&duration=${Math.round(clip.duration)}&thumbnail=${encodeURIComponent(clip.thumbnail)}`;
                   return (
-                    <Card key={clip.url}>
-                      <CardHeader>
+                    <Card key={clip.url} className="overflow-hidden">
+                      <div className="aspect-video bg-gray-100 relative">
+                        <img
+                          src={clip.thumbnail}
+                          alt={clip.title}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <CardHeader className="pt-3">
                         <CardTitle className="text-base">{clip.title}</CardTitle>
                         <CardDescription>
                           المدة: {Math.round(clip.duration)} ثانية
