@@ -99,12 +99,12 @@ export async function transcribeAudio(filePath: string): Promise<TranscriptSegme
 
   const segments: TranscriptSegment[] = Array.isArray(data?.segments)
     ? data.segments
-        .map((segment: any) => ({
-          start: normalizeTime(segment.start),
-          end: normalizeTime(segment.end),
-          text: String(segment.text ?? "").trim()
-        }))
-        .filter((segment: TranscriptSegment) => segment.text)
+      .map((segment: any) => ({
+        start: normalizeTime(segment.start),
+        end: normalizeTime(segment.end),
+        text: String(segment.text ?? "").trim()
+      }))
+      .filter((segment: TranscriptSegment) => segment.text)
     : buildSegmentsFromWords(words);
 
   return segments.filter((segment) => segment.text);
