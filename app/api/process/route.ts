@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, rm } from "fs/promises";
 import os from "os";
 import path from "path";
 import { Readable } from "stream";
+import { pipeline } from "stream/promises";
 import crypto from "crypto";
 import Busboy from "busboy";
 import { extractAudio, clipVideo } from "../../../lib/ffmpeg";
@@ -18,6 +19,27 @@ type UploadedFile = {
   filename: string;
   tempDir: string;
   fields: Record<string, string>;
+};
+
+const parseJsonUpload = async (request: Request): Promise<UploadedFile> => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "realify-"));
+  const body = await request.json();
+  const videoUrl = body?.videoUrl;
+  if (!videoUrl) {
+    throw new Error("Missing videoUrl");
+  }
+
+  const sourceUrl = new URL(videoUrl);
+  const filename = path.basename(sourceUrl.pathname) || `upload-${Date.now()}.mp4`;
+  const filePath = path.join(tempDir, filename);
+
+  const response = await fetch(videoUrl);
+  if (!response.ok || !response.body) {
+    throw new Error("Failed to download video");
+  }
+
+  await pipeline(Readable.fromWeb(response.body as any), createWriteStream(filePath));
+  return { filePath, filename, tempDir, fields: {} };
 };
 
 const parseUpload = async (request: Request): Promise<UploadedFile> => {
@@ -88,7 +110,10 @@ const parseUpload = async (request: Request): Promise<UploadedFile> => {
 export async function POST(request: Request) {
   let tempDir = "";
   try {
-    const upload = await parseUpload(request);
+    const contentType = request.headers.get("content-type") || "";
+    const upload = contentType.includes("application/json")
+      ? await parseJsonUpload(request)
+      : await parseUpload(request);
     tempDir = upload.tempDir;
 
     const audioPath = path.join(tempDir, "audio.wav");
@@ -172,6 +197,8 @@ export async function POST(request: Request) {
     const clientErrorMessages = [
       "Missing ELEVENLABS_API_KEY",
       "Missing GEMINI_API_KEY",
+      "Missing videoUrl",
+      "Failed to download video",
       "Expected multipart/form-data",
       "Request body was empty",
       "No video file uploaded"

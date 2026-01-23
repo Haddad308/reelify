@@ -10,7 +10,15 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const payload = await request.json();
+    const bodyText = await request.text();
+    if (!bodyText.trim()) {
+      const preferences = await loadPreferences();
+      return NextResponse.json({ preferences });
+    }
+    const payload = JSON.parse(bodyText);
+    if (!payload || typeof payload !== "object") {
+      return NextResponse.json({ error: "Invalid preferences payload" }, { status: 400 });
+    }
     const preferences = await savePreferences(payload ?? {});
     return NextResponse.json({ preferences });
   } catch {

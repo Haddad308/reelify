@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { upload } from "@vercel/blob/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -23,6 +24,7 @@ type ClipItem = {
 
 export default function HomePage() {
   const [file, setFile] = useState<File | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [clips, setClips] = useState<ClipItem[]>([]);
   const [status, setStatus] = useState<string>("");
   const [error, setError] = useState<string>("");
@@ -30,6 +32,7 @@ export default function HomePage() {
     "upload"
   );
   const [step, setStep] = useState(1);
+  const [isUploading, setIsUploading] = useState(false);
   const [platform, setPlatform] = useState("instagram");
   const [preferredDuration, setPreferredDuration] = useState(45);
   const [audience, setAudience] = useState("شباب 18-30");
@@ -52,7 +55,7 @@ export default function HomePage() {
     }
   };
 
-  const onUploadSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const onUploadSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
     setStatus("");
@@ -63,23 +66,41 @@ export default function HomePage() {
       return;
     }
 
-    setStep(1);
-    setScreen("form");
+    try {
+      setIsUploading(true);
+      setStatus("جارٍ رفع الفيديو...");
+      const blob = await upload(file.name, file, {
+        access: "public",
+        handleUploadUrl: "/api/upload"
+      });
+      setVideoUrl(blob.url);
+      setStep(1);
+      setScreen("form");
+      setStatus("");
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "تعذر رفع الفيديو، حاول مرة أخرى.";
+      setError(message);
+      setStatus("");
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const onStartProcessing = async () => {
     try {
+      if (!videoUrl) {
+        throw new Error("يرجى رفع الفيديو أولاً.");
+      }
       setScreen("loading");
       setStatus("نجهّز الفيديو الآن...");
-      const formData = new FormData();
-      if (!file) {
-        throw new Error("يرجى اختيار فيديو قبل المتابعة.");
-      }
-      formData.append("video", file);
-
+      const requestBody = { videoUrl };
       const response = await fetch("/api/process", {
         method: "POST",
-        body: formData
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(requestBody)
       });
 
       const payload = await response.json();
@@ -129,9 +150,10 @@ export default function HomePage() {
                   onChange={(event) => setFile(event.target.files?.[0] ?? null)}
                   className="file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-semibold file:text-primary-foreground file:transition hover:file:opacity-90"
                 />
-                <Button type="submit" disabled={!file}>
-                  التالي
+                <Button type="submit" disabled={!file || isUploading}>
+                  {isUploading ? "جارٍ الرفع..." : "التالي"}
                 </Button>
+                {status ? <p className="text-sm text-primary">{status}</p> : null}
                 {error ? <p className="text-sm text-destructive">{error}</p> : null}
               </form>
             </CardContent>

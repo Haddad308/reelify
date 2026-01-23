@@ -18,6 +18,7 @@
    ELEVENLABS_API_KEY=YOUR_KEY
    GEMINI_API_KEY=YOUR_KEY
    GEMINI_MODEL=gemini-2.5-flash
+   BLOB_READ_WRITE_TOKEN=YOUR_KEY
    ```
 
 ## التشغيل
@@ -29,7 +30,7 @@ npm run dev
 ## اختبار يدوي
 
 1. افتح `http://localhost:3000`.
-2. ارفع فيديو عربي محلي من جهازك.
+2. ارفع فيديو عربي محلي من جهازك (سيتم رفعه إلى Vercel Blob أولاً).
 3. انتظر حتى تظهر المقاطع مع العناوين العربية وروابط التحميل.
 
 ## الملاحظات
@@ -37,4 +38,5 @@ npm run dev
 - يتم حفظ المقاطع الناتجة داخل `public/clips/`.
 - واجهة البرمجة تعمل على Node.js عبر `runtime = "nodejs"`.
 - في حال وجود خطأ، ستظهر رسالة واضحة مثل: `Missing GEMINI_API_KEY` أو `Transcript was empty`.
+- في الإنتاج يتم رفع الفيديو إلى Vercel Blob لتجنب قيود حجم الطلبات.
 
