@@ -1,116 +1,43 @@
 import { NextResponse } from "next/server";
-import { createWriteStream } from "fs";
+import { writeFile } from "fs/promises";
 import { mkdtemp, rm } from "fs/promises";
 import os from "os";
 import path from "path";
-import { Readable } from "stream";
-import Busboy from "busboy";
 import { transcribeAudio } from "../../../lib/elevenlabs";
 import { generateClipCandidates } from "../../../lib/gemini";
 import { loadPreferences, savePreferences, type QAPreferences } from "../../../lib/qaStore";
 
 export const runtime = "nodejs";
 
-type UploadedFile = {
-  filePath: string;
-  tempDir: string;
-  fields: Record<string, string>;
-};
-
-const parseUpload = async (request: Request): Promise<UploadedFile> => {
-  const contentType = request.headers.get("content-type");
-  if (!contentType || !contentType.includes("multipart/form-data")) {
-    throw new Error("Expected multipart/form-data");
-  }
-
-  if (!request.body) {
-    throw new Error("Request body was empty");
-  }
-
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), "realify-"));
-
-  return await new Promise((resolve, reject) => {
-    const busboy = Busboy({
-      headers: {
-        "content-type": contentType
-      }
-    });
-
-    let filePath = "";
-    let fileSaved: Promise<void> | null = null;
-    const fields: Record<string, string> = {};
-
-    busboy.on("file", (_fieldname, file, info) => {
-      if (filePath) {
-        file.resume();
-        return;
-      }
-      const incomingName = info.filename || `audio-${Date.now()}.wav`;
-      const safeName = incomingName.replace(/[^\w.-]/g, "_");
-      filePath = path.join(tempDir, safeName);
-
-      const writeStream = createWriteStream(filePath);
-      file.pipe(writeStream);
-      fileSaved = new Promise((resolveWrite, rejectWrite) => {
-        writeStream.on("finish", resolveWrite);
-        writeStream.on("error", rejectWrite);
-        file.on("error", rejectWrite);
-      });
-    });
-
-    busboy.on("field", (fieldname, value) => {
-      fields[fieldname] = String(value ?? "").trim();
-    });
-
-    busboy.on("error", reject);
-
-    busboy.on("finish", async () => {
-      if (!filePath || !fileSaved) {
-        reject(new Error("No video file uploaded"));
-        return;
-      }
-      try {
-        await fileSaved;
-        resolve({ filePath, tempDir, fields });
-      } catch (error) {
-        reject(error);
-      }
-    });
-
-    Readable.fromWeb(request.body as any).pipe(busboy);
-  });
-};
-
+// Accept JSON with audioUrl (Vercel Blob URL)
 export async function POST(request: Request) {
   let tempDir = "";
   try {
-    const upload = await parseUpload(request);
-    tempDir = upload.tempDir;
+    const body = await request.json();
+    const { audioUrl } = body as { audioUrl?: string };
 
-    const segments = await transcribeAudio(upload.filePath);
+    if (!audioUrl) {
+      return NextResponse.json({ error: "Missing audioUrl" }, { status: 400 });
+    }
+
+    // Download audio from Vercel Blob
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "realify-"));
+    const audioPath = path.join(tempDir, "audio.wav");
+
+    const audioResponse = await fetch(audioUrl);
+    if (!audioResponse.ok) {
+      throw new Error("Failed to download audio from blob");
+    }
+    const audioBuffer = Buffer.from(await audioResponse.arrayBuffer());
+    await writeFile(audioPath, audioBuffer);
+
+    const segments = await transcribeAudio(audioPath);
     if (segments.length === 0) {
       return NextResponse.json({ error: "Transcript was empty" }, { status: 400 });
     }
 
-    const preferredDuration = upload.fields.preferredDuration
-      ? Number(upload.fields.preferredDuration)
-      : undefined;
-    const preferenceUpdate: QAPreferences = {
-      platform: upload.fields.platform || undefined,
-      preferredDuration: Number.isFinite(preferredDuration) ? preferredDuration : undefined,
-      audience: upload.fields.audience || undefined,
-      tone: upload.fields.tone || undefined,
-      hookStyle: upload.fields.hookStyle || undefined,
-      keyTopics: upload.fields.keyTopics || undefined,
-      callToAction: upload.fields.callToAction || undefined
-    };
-
-    const hasUpdate = Object.values(preferenceUpdate).some(
-      (value) => value !== undefined && value !== ""
-    );
-    const mergedPreferences = hasUpdate
-      ? await savePreferences(preferenceUpdate)
-      : await loadPreferences();
+    // Load preferences from storage
+    const mergedPreferences = await loadPreferences();
 
     const clipCandidates = await generateClipCandidates(segments, mergedPreferences);
     if (clipCandidates.length === 0) {
@@ -125,9 +52,8 @@ export async function POST(request: Request) {
     const clientErrorMessages = [
       "Missing ELEVENLABS_API_KEY",
       "Missing GEMINI_API_KEY",
-      "Expected multipart/form-data",
-      "Request body was empty",
-      "No video file uploaded"
+      "Missing audioUrl",
+      "Failed to download audio from blob"
     ];
     const status = clientErrorMessages.includes(message) ? 400 : 500;
     return NextResponse.json({ error: message }, { status });

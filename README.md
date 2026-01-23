@@ -1,11 +1,11 @@
 # Realify Arabic Reels
 
-تحويل الفيديوهات العربية إلى مقاطع قصيرة جاهزة للنشر باستخدام ElevenLabs وGemini وFFmpeg.
+تحويل الفيديوهات العربية إلى مقاطع قصيرة جاهزة للنشر باستخدام ElevenLabs وGemini وFFmpeg.wasm.
 
 ## المتطلبات
 
 - Node.js 18+
-- FFmpeg مثبت على الجهاز ومتاح في PATH (أو استخدام حزم ffmpeg المدمجة في الإنتاج)
+- حساب Vercel مع Blob Storage مفعّل
 
 ## الإعداد
 
@@ -18,9 +18,7 @@
    ELEVENLABS_API_KEY=YOUR_KEY
    GEMINI_API_KEY=YOUR_KEY
    GEMINI_MODEL=gemini-2.5-flash
-   BLOB_READ_WRITE_TOKEN=YOUR_KEY
-   # اختياري: مسار FFmpeg
-   FFMPEG_PATH=/path/to/ffmpeg
+   BLOB_READ_WRITE_TOKEN=YOUR_VERCEL_BLOB_TOKEN
    ```
 
 ## التشغيل
@@ -32,14 +30,20 @@ npm run dev
 ## اختبار يدوي
 
 1. افتح `http://localhost:3000`.
-2. ارفع فيديو عربي محلي من جهازك (سيتم رفعه إلى Vercel Blob أولاً).
-3. انتظر حتى تظهر المقاطع مع العناوين العربية وروابط التحميل.
+2. ارفع فيديو عربي محلي من جهازك.
+3. أجب على الأسئلة التسويقية.
+4. انتظر حتى تظهر المقاطع مع العناوين العربية وروابط التحميل.
+
+## البنية التقنية
+
+- **FFmpeg.wasm**: يعمل في المتصفح لاستخراج الصوت وتقطيع الفيديو (لا حاجة لتثبيت FFmpeg على الخادم).
+- **Vercel Blob**: تخزين الصوت والمقاطع الناتجة لتجنب قيود حجم الطلبات.
+- **ElevenLabs**: تحويل الصوت إلى نص مع توقيتات دقيقة.
+- **Gemini**: اختيار أفضل المقاطع وتوليد العناوين بالعربية.
 
 ## الملاحظات
 
-- يتم حفظ المقاطع الناتجة داخل `public/clips/`.
 - واجهة البرمجة تعمل على Node.js عبر `runtime = "nodejs"`.
 - في حال وجود خطأ، ستظهر رسالة واضحة مثل: `Missing GEMINI_API_KEY` أو `Transcript was empty`.
-- في الإنتاج يتم رفع الفيديو إلى Vercel Blob لتجنب قيود حجم الطلبات.
-- في بيئات لا يتوفر فيها FFmpeg على PATH، يتم استخدام `ffmpeg-static` أو `@ffmpeg-installer/ffmpeg`.
+- المقاطع الناتجة تُخزّن في Vercel Blob ويمكن تحميلها مباشرة.
 

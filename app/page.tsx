@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { upload } from "@vercel/blob/client";
 import { getFfmpeg, writeInputFile, extractAudioWav, clipVideoSegment } from "@/lib/ffmpegWasm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -85,12 +86,20 @@ export default function HomePage() {
       const audioName = `audio-${Date.now()}.wav`;
       const audioBlob = await extractAudioWav(ffmpeg, inputName, audioName);
 
+      // Upload audio to Vercel Blob
+      setStatus("نرفع الصوت للمعالجة...");
+      const audioFile = new File([audioBlob], "audio.wav", { type: "audio/wav" });
+      const audioUpload = await upload(audioFile.name, audioFile, {
+        access: "public",
+        handleUploadUrl: "/api/upload",
+      });
+
+      // Send audio URL to server for transcription
       setStatus("نحلل النص ونختار أفضل المقاطع...");
-      const audioForm = new FormData();
-      audioForm.append("audio", audioBlob, "audio.wav");
       const response = await fetch("/api/process", {
         method: "POST",
-        body: audioForm
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ audioUrl: audioUpload.url }),
       });
 
       const payload = await response.json();
@@ -115,25 +124,21 @@ export default function HomePage() {
           candidate.start,
           candidate.end
         );
-        const clipForm = new FormData();
-        clipForm.append("clip", clipBlob, clipName);
-        clipForm.append("title", candidate.title);
-        clipForm.append("start", String(candidate.start));
-        clipForm.append("end", String(candidate.end));
-        const clipResponse = await fetch("/api/clip", {
-          method: "POST",
-          body: clipForm
+
+        // Upload clip to Vercel Blob
+        const clipFile = new File([clipBlob], clipName, { type: "video/mp4" });
+        const clipUpload = await upload(clipFile.name, clipFile, {
+          access: "public",
+          handleUploadUrl: "/api/upload",
         });
-        const clipPayload = await clipResponse.json();
-        if (!clipResponse.ok) {
-          throw new Error(clipPayload?.error || "تعذر حفظ المقطع.");
-        }
+
+        const duration = Math.max(0, candidate.end - candidate.start);
         uploadedClips.push({
-          title: clipPayload.title,
-          start: clipPayload.start,
-          end: clipPayload.end,
-          duration: clipPayload.duration,
-          url: clipPayload.url
+          title: candidate.title,
+          start: candidate.start,
+          end: candidate.end,
+          duration,
+          url: clipUpload.url,
         });
       }
 
