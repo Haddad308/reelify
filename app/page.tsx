@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { upload } from "@vercel/blob/client";
 import { getFfmpeg, writeInputFile, extractAudioWav, clipVideoSegment, extractThumbnail, cleanupInputFile } from "@/lib/ffmpegWasm";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,33 @@ export default function HomePage() {
   const [keyTopics, setKeyTopics] = useState<string[]>([]);
   const [callToAction, setCallToAction] = useState("شارك مع صديق");
 
+  // Background processing state
+  const [backgroundResult, setBackgroundResult] = useState<{
+    ffmpeg: Awaited<ReturnType<typeof getFfmpeg>>;
+    inputName: string;
+    candidates: Array<{ title: string; start: number; end: number; category: string; tags: string[] }>;
+    segments: TranscriptSegment[];
+  } | null>(null);
+  const [backgroundError, setBackgroundError] = useState<string>("");
+  const [backgroundProcessing, setBackgroundProcessing] = useState(false);
+
+  // Refs to access latest background state in async functions
+  const backgroundResultRef = useRef(backgroundResult);
+  const backgroundErrorRef = useRef(backgroundError);
+  const backgroundProcessingRef = useRef(backgroundProcessing);
+
+  useEffect(() => {
+    backgroundResultRef.current = backgroundResult;
+  }, [backgroundResult]);
+
+  useEffect(() => {
+    backgroundErrorRef.current = backgroundError;
+  }, [backgroundError]);
+
+  useEffect(() => {
+    backgroundProcessingRef.current = backgroundProcessing;
+  }, [backgroundProcessing]);
+
   const persistPreferences = async (partial: Record<string, unknown>) => {
     try {
       await fetch("/api/preferences", {
@@ -65,47 +92,29 @@ export default function HomePage() {
     }
   };
 
-  const onUploadSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setError("");
-    setStatus("");
-    setClips([]);
+  const startBackgroundProcessing = async (videoFile: File) => {
+    setBackgroundProcessing(true);
+    setBackgroundError("");
+    setBackgroundResult(null);
 
-    if (!file) {
-      setError("يرجى اختيار فيديو قبل المتابعة.");
-      return;
-    }
-
-    setStep(1);
-    setScreen("form");
-  };
-
-  const onStartProcessing = async () => {
     try {
-      if (!file) {
-        throw new Error("يرجى رفع الفيديو أولاً.");
-      }
-      setError("");
-      setScreen("loading");
-      setIsProcessing(true);
-      setStatus("نجهّز الصوت للتفريغ...");
+      // Load FFmpeg and write input file
       const ffmpeg = await getFfmpeg();
       const inputName = `input-${Date.now()}.mp4`;
-      await writeInputFile(ffmpeg, inputName, file);
+      await writeInputFile(ffmpeg, inputName, videoFile);
 
+      // Extract audio
       const audioName = `audio-${Date.now()}.wav`;
       const audioBlob = await extractAudioWav(ffmpeg, inputName, audioName);
 
       // Upload audio to Vercel Blob
-      setStatus("نرفع الصوت للمعالجة...");
       const audioFile = new File([audioBlob], "audio.wav", { type: "audio/wav" });
       const audioUpload = await upload(audioFile.name, audioFile, {
         access: "public",
         handleUploadUrl: "/api/upload",
       });
 
-      // Send audio URL to server for transcription
-      setStatus("نحلل النص ونختار أفضل المقاطع...");
+      // Call /api/process for transcription and Gemini analysis
       const response = await fetch("/api/process", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -114,14 +123,80 @@ export default function HomePage() {
 
       const payload = await response.json();
       if (!response.ok) {
-        throw new Error(payload?.error || "حدث خطأ غير متوقع أثناء المعالجة.");
+        throw new Error(payload?.error || "حدث خطأ أثناء التحليل.");
       }
 
       const candidates = Array.isArray(payload?.clips) ? payload.clips : [];
       const segments: TranscriptSegment[] = Array.isArray(payload?.segments) ? payload.segments : [];
+
       if (candidates.length === 0) {
         throw new Error("لم يتم العثور على مقاطع مناسبة.");
       }
+
+      // Store results
+      setBackgroundResult({
+        ffmpeg,
+        inputName,
+        candidates,
+        segments,
+      });
+    } catch (err) {
+      console.error("Background processing error:", err);
+      const message = err instanceof Error ? err.message : "حدث خطأ أثناء المعالجة.";
+      setBackgroundError(message);
+    } finally {
+      setBackgroundProcessing(false);
+    }
+  };
+
+  const onUploadSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError("");
+    setStatus("");
+    setClips([]);
+    setBackgroundError("");
+    setBackgroundResult(null);
+
+    if (!file) {
+      setError("يرجى اختيار فيديو قبل المتابعة.");
+      return;
+    }
+
+    setStep(1);
+    setScreen("form");
+
+    // Start background processing (fire and forget)
+    void startBackgroundProcessing(file);
+  };
+
+  const onStartProcessing = async () => {
+    setError("");
+    setScreen("loading");
+    setIsProcessing(true);
+
+    try {
+      // Wait for background processing if still running
+      if (backgroundProcessingRef.current) {
+        setStatus("ننتظر اكتمال التحليل...");
+        // Poll until background processing is done (max 120 seconds)
+        let attempts = 0;
+        while (backgroundProcessingRef.current && attempts < 1200) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          attempts++;
+        }
+      }
+
+      // Check for background error
+      if (backgroundErrorRef.current) {
+        throw new Error(backgroundErrorRef.current);
+      }
+
+      // Check if background result is ready
+      if (!backgroundResultRef.current) {
+        throw new Error("لم يتم تحليل الفيديو بعد. يرجى المحاولة مرة أخرى.");
+      }
+
+      const { ffmpeg, inputName, candidates, segments } = backgroundResultRef.current;
 
       // Helper to extract transcript for a specific time range
       const getClipTranscript = (start: number, end: number): string => {
@@ -293,6 +368,32 @@ export default function HomePage() {
                 </div>
                 <Progress value={(step / totalSteps) * 100} className="h-2" />
               </div>
+
+              {/* Background Processing Indicator */}
+              {backgroundProcessing && (
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  <span>نحلل الفيديو في الخلفية...</span>
+                </div>
+              )}
+
+              {backgroundResult && !backgroundProcessing && (
+                <div className="flex items-center justify-center gap-2 text-sm text-green-600">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span>جاهز للتحويل</span>
+                </div>
+              )}
+
+              {backgroundError && (
+                <div className="flex items-center justify-center gap-2 text-sm text-destructive">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>{backgroundError}</span>
+                </div>
+              )}
 
               {/* Question Title */}
               <h2 className="text-xl font-semibold text-center text-gray-900">
