@@ -104,7 +104,7 @@ export async function transcribeAudio(filePath: string): Promise<TranscriptSegme
           end: normalizeTime(segment.end),
           text: String(segment.text ?? "").trim()
         }))
-        .filter((segment) => segment.text)
+        .filter((segment: TranscriptSegment) => segment.text)
     : buildSegmentsFromWords(words);
 
   return segments.filter((segment) => segment.text);
