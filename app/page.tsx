@@ -457,24 +457,27 @@ export default function HomePage() {
             {clips.length === 0 ? (
               <p className="text-sm text-muted-foreground">لم يتم إنشاء أي مقاطع بعد.</p>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2">
-                {clips.map((clip) => (
-                  <Card key={clip.url}>
-                    <CardHeader>
-                      <CardTitle className="text-base">{clip.title}</CardTitle>
-                      <CardDescription>
-                        المدة: {Math.round(clip.duration)} ثانية
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <Button asChild>
-                        <a href={clip.url} download>
-                          تحميل المقطع
-                        </a>
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {clips.map((clip) => {
+                  const previewUrl = `/preview?url=${encodeURIComponent(clip.url)}&title=${encodeURIComponent(clip.title)}&duration=${Math.round(clip.duration)}`;
+                  return (
+                    <Card key={clip.url}>
+                      <CardHeader>
+                        <CardTitle className="text-base">{clip.title}</CardTitle>
+                        <CardDescription>
+                          المدة: {Math.round(clip.duration)} ثانية
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <Button asChild>
+                          <a href={previewUrl} target="_blank" rel="noopener noreferrer">
+                            معاينة وتحميل
+                          </a>
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </section>
