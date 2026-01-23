@@ -26,7 +26,9 @@ export default function HomePage() {
   const [clips, setClips] = useState<ClipItem[]>([]);
   const [status, setStatus] = useState<string>("");
   const [error, setError] = useState<string>("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [screen, setScreen] = useState<"upload" | "form" | "loading" | "results">(
+    "upload"
+  );
   const [step, setStep] = useState(1);
   const [platform, setPlatform] = useState("instagram");
   const [preferredDuration, setPreferredDuration] = useState(45);
@@ -37,7 +39,6 @@ export default function HomePage() {
   const [callToAction, setCallToAction] = useState("شارك مع صديق");
 
   const persistPreferences = async (partial: Record<string, unknown>) => {
-    if (!isLoading) return;
     try {
       await fetch("/api/preferences", {
         method: "POST",
@@ -51,7 +52,7 @@ export default function HomePage() {
     }
   };
 
-  const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const onUploadSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
     setStatus("");
@@ -62,14 +63,20 @@ export default function HomePage() {
       return;
     }
 
+    setStep(1);
+    setScreen("form");
+  };
+
+  const onStartProcessing = async () => {
     try {
-      setIsLoading(true);
-      setStep(1);
-      setStatus("جارٍ رفع الفيديو...");
+      setScreen("loading");
+      setStatus("نجهّز الفيديو الآن...");
       const formData = new FormData();
+      if (!file) {
+        throw new Error("يرجى اختيار فيديو قبل المتابعة.");
+      }
       formData.append("video", file);
 
-      setStatus("جارٍ معالجة الفيديو وتحليل المحتوى...");
       const response = await fetch("/api/process", {
         method: "POST",
         body: formData
@@ -82,13 +89,13 @@ export default function HomePage() {
       }
 
       setClips(payload.clips || []);
-      setStatus("تم إنشاء المقاطع بنجاح.");
+      setStatus("");
+      setScreen("results");
     } catch (err) {
       const message = err instanceof Error ? err.message : "تعذر إكمال المعالجة.";
       setError(message);
       setStatus("");
-    } finally {
-      setIsLoading(false);
+      setScreen("form");
     }
   };
 
@@ -107,36 +114,35 @@ export default function HomePage() {
           </p>
         </header>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>ارفع الفيديو</CardTitle>
-            <CardDescription>ابدأ برفع الفيديو المحلي ثم انتقل للأسئلة.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form className="flex flex-col gap-4" onSubmit={onSubmit}>
-              <input
-                id="video"
-                type="file"
-                accept="video/*"
-                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-                className="file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-semibold file:text-primary-foreground file:transition hover:file:opacity-90"
-              />
-              <Button type="submit" disabled={!file || isLoading}>
-                {isLoading ? "جارٍ المعالجة..." : "ابدأ التحويل"}
-              </Button>
-              {status ? <p className="text-sm text-primary">{status}</p> : null}
-              {error ? <p className="text-sm text-destructive">{error}</p> : null}
-            </form>
-          </CardContent>
-        </Card>
-
-        {isLoading ? (
+        {screen === "upload" ? (
           <Card>
             <CardHeader>
-              <CardTitle>إجابات سريعة أثناء المعالجة</CardTitle>
-              <CardDescription>
-                اختر الإجابات المناسبة لتحسين انتقاء المقاطع والعناوين.
-              </CardDescription>
+              <CardTitle>ارفع الفيديو</CardTitle>
+              <CardDescription>ابدأ برفع الفيديو المحلي ثم انتقل للأسئلة.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form className="flex flex-col gap-4" onSubmit={onUploadSubmit}>
+                <input
+                  id="video"
+                  type="file"
+                  accept="video/*"
+                  onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                  className="file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-semibold file:text-primary-foreground file:transition hover:file:opacity-90"
+                />
+                <Button type="submit" disabled={!file}>
+                  التالي
+                </Button>
+                {error ? <p className="text-sm text-destructive">{error}</p> : null}
+              </form>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {screen === "form" ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>الأسئلة التسويقية</CardTitle>
+              <CardDescription>اختر الإجابات المناسبة لتحسين النتائج.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
@@ -353,38 +359,61 @@ export default function HomePage() {
                   >
                     التالي
                   </Button>
-                ) : null}
+                ) : (
+                  <Button type="button" onClick={onStartProcessing}>
+                    ابدأ التحويل
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
         ) : null}
 
-        <section className="space-y-4">
-          <h2 className="text-xl font-semibold">المقاطع الجاهزة</h2>
-          {clips.length === 0 && !isLoading ? (
-            <p className="text-sm text-muted-foreground">لم يتم إنشاء أي مقاطع بعد.</p>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {clips.map((clip) => (
-                <Card key={clip.url}>
-                  <CardHeader>
-                    <CardTitle className="text-base">{clip.title}</CardTitle>
-                    <CardDescription>
-                      المدة: {Math.round(clip.duration)} ثانية
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Button asChild>
-                      <a href={clip.url} download>
-                        تحميل المقطع
-                      </a>
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </section>
+        {screen === "loading" ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>نحضّر مقاطعك الآن</CardTitle>
+              <CardDescription>نحن نجهّز الفيديوهات المناسبة لك الآن.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <Progress value={66} />
+                <p className="text-sm text-muted-foreground">
+                  {status || "يرجى الانتظار قليلاً..."}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {screen === "results" ? (
+          <section className="space-y-4">
+            <h2 className="text-xl font-semibold">المقاطع الجاهزة</h2>
+            {clips.length === 0 ? (
+              <p className="text-sm text-muted-foreground">لم يتم إنشاء أي مقاطع بعد.</p>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {clips.map((clip) => (
+                  <Card key={clip.url}>
+                    <CardHeader>
+                      <CardTitle className="text-base">{clip.title}</CardTitle>
+                      <CardDescription>
+                        المدة: {Math.round(clip.duration)} ثانية
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Button asChild>
+                        <a href={clip.url} download>
+                          تحميل المقطع
+                        </a>
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </section>
+        ) : null}
       </section>
     </main>
   );
