@@ -4,26 +4,27 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 224 71% 4%;
+    /* Teal/Emerald Primary Palette */
+    --background: 40 33% 99%;
+    --foreground: 220 20% 15%;
     --card: 0 0% 100%;
-    --card-foreground: 224 71% 4%;
+    --card-foreground: 220 20% 15%;
     --popover: 0 0% 100%;
-    --popover-foreground: 224 71% 4%;
-    --primary: 262 83% 58%;
+    --popover-foreground: 220 20% 15%;
+    --primary: 160 84% 39%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 224 71% 4%;
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
-    --accent: 262 83% 96%;
-    --accent-foreground: 262 83% 40%;
+    --secondary: 45 30% 96%;
+    --secondary-foreground: 220 20% 15%;
+    --muted: 45 20% 95%;
+    --muted-foreground: 220 10% 45%;
+    --accent: 24 95% 53%;
+    --accent-foreground: 0 0% 100%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 262 83% 58%;
-    --radius: 0.75rem;
+    --border: 40 20% 90%;
+    --input: 40 20% 90%;
+    --ring: 160 84% 39%;
+    --radius: 1rem;
   }
 
   * {
@@ -32,7 +33,178 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: "Segoe UI", "Tahoma", "Arial", sans-serif;
+    font-family: "Inter", "Segoe UI", "Tahoma", "Arial", sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
   }
 }
 
+/* Custom Animations */
+@layer utilities {
+  /* Fade In Animation */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Fade In Scale Animation */
+  @keyframes fadeInScale {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  /* Slide Up Animation */
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Shimmer Animation for Skeletons */
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
+  /* Pulse Glow Animation */
+  @keyframes pulseGlow {
+    0%, 100% {
+      box-shadow: 0 0 0 0 rgba(20, 184, 166, 0.4);
+    }
+    50% {
+      box-shadow: 0 0 0 10px rgba(20, 184, 166, 0);
+    }
+  }
+
+  /* Bounce Subtle */
+  @keyframes bounceSoft {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-5px);
+    }
+  }
+
+  /* Animation Classes */
+  .animate-fade-in {
+    animation: fadeIn 0.6s ease-out forwards;
+  }
+
+  .animate-fade-in-scale {
+    animation: fadeInScale 0.5s ease-out forwards;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.7s ease-out forwards;
+  }
+
+  .animate-shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 0%,
+      hsl(40 30% 92%) 50%,
+      hsl(var(--muted)) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  .animate-pulse-glow {
+    animation: pulseGlow 2s infinite;
+  }
+
+  .animate-bounce-soft {
+    animation: bounceSoft 0.5s ease-out;
+  }
+
+  /* Stagger Animation Delays */
+  .animate-stagger-1 { animation-delay: 0.1s; opacity: 0; }
+  .animate-stagger-2 { animation-delay: 0.2s; opacity: 0; }
+  .animate-stagger-3 { animation-delay: 0.3s; opacity: 0; }
+  .animate-stagger-4 { animation-delay: 0.4s; opacity: 0; }
+  .animate-stagger-5 { animation-delay: 0.5s; opacity: 0; }
+  .animate-stagger-6 { animation-delay: 0.6s; opacity: 0; }
+
+  /* Gradient Backgrounds */
+  .bg-gradient-warm {
+    background: linear-gradient(135deg, hsl(40 33% 99%) 0%, hsl(45 40% 97%) 100%);
+  }
+
+  .bg-gradient-teal {
+    background: linear-gradient(135deg, hsl(160 84% 39%) 0%, hsl(170 80% 45%) 100%);
+  }
+
+  .bg-gradient-coral {
+    background: linear-gradient(135deg, hsl(24 95% 53%) 0%, hsl(35 95% 58%) 100%);
+  }
+
+  .bg-gradient-card {
+    background: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(45 30% 98%) 100%);
+  }
+
+  /* Enhanced Shadows */
+  .shadow-teal {
+    box-shadow: 0 10px 40px -10px rgba(20, 184, 166, 0.2);
+  }
+
+  .shadow-warm {
+    box-shadow: 0 10px 40px -10px rgba(251, 146, 60, 0.15);
+  }
+
+  .shadow-card {
+    box-shadow: 
+      0 4px 6px -1px rgba(0, 0, 0, 0.05),
+      0 10px 30px -5px rgba(0, 0, 0, 0.08);
+  }
+
+  .shadow-card-hover {
+    box-shadow: 
+      0 10px 25px -5px rgba(0, 0, 0, 0.1),
+      0 20px 50px -10px rgba(20, 184, 166, 0.15);
+  }
+
+  /* Skeleton Base */
+  .skeleton {
+    @apply rounded-lg bg-muted animate-shimmer;
+  }
+
+  /* Smooth Transitions */
+  .transition-smooth {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Button Enhancements */
+  .btn-gradient {
+    @apply bg-gradient-teal text-white font-semibold;
+    @apply hover:shadow-lg hover:shadow-primary/25;
+    @apply active:scale-[0.98];
+    @apply transition-all duration-200;
+  }
+
+  /* Progress Bar Gradient */
+  .progress-gradient {
+    background: linear-gradient(90deg, hsl(160 84% 39%) 0%, hsl(24 95% 53%) 100%);
+  }
+}
