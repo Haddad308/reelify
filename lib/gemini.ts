@@ -74,7 +74,7 @@ export async function generateClipCandidates(
     throw new Error("Missing GEMINI_API_KEY");
   }
 
-  const modelName = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+  const modelName = process.env.GEMINI_MODEL || "gemini-2.5-pro";
   const client = new GoogleGenerativeAI(apiKey);
   const model = client.getGenerativeModel({ model: modelName });
 
