@@ -187,264 +187,325 @@ export default function HomePage() {
     }
   };
 
+  const totalSteps = 7;
+
+  const questionTitles: Record<number, string> = {
+    1: "على أي منصة ستنشر الفيديو؟",
+    2: "ما المدة المفضلة للمقطع؟",
+    3: "من هو الجمهور المستهدف؟",
+    4: "ما النبرة الأنسب للمقطع؟",
+    5: "ما أسلوب الافتتاح (الهوك)؟",
+    6: "ما أهم المحاور التي تريد التركيز عليها؟",
+    7: "هل تريد دعوة للفعل محددة؟",
+  };
+
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <section className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 pb-20 pt-12">
-        <header className="flex flex-col gap-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.4em] text-primary">
+    <main className="min-h-screen bg-gradient-to-b from-white to-gray-50" dir="rtl">
+      <section className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-6 pb-20 pt-16">
+        {/* Header */}
+        <header className="text-center space-y-3">
+          <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
+            <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
             Realify
-          </p>
-          <h1 className="text-3xl font-semibold leading-snug">
-            اصنع ريلز عربية دقيقة خلال دقائق
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">
+            اصنع ريلز عربية احترافية
           </h1>
-          <p className="text-sm text-muted-foreground">
-            ارفع الفيديو أولاً، وخلال المعالجة أجب عن أسئلة قصيرة لالتقاط أفضل المقاطع.
+          <p className="text-muted-foreground max-w-md mx-auto">
+            ارفع الفيديو وأجب عن أسئلة بسيطة لنصنع لك أفضل المقاطع
           </p>
         </header>
 
-        {screen === "upload" ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>ارفع الفيديو</CardTitle>
-              <CardDescription>ابدأ برفع الفيديو المحلي ثم انتقل للأسئلة.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form className="flex flex-col gap-4" onSubmit={onUploadSubmit}>
-                <input
-                  id="video"
-                  type="file"
-                  accept="video/*"
-                  onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-                  className="file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-semibold file:text-primary-foreground file:transition hover:file:opacity-90"
-                />
-                <Button type="submit" disabled={!file}>
-                  التالي
+        {/* Upload Screen */}
+        {screen === "upload" && (
+          <Card className="shadow-lg border-0 bg-white">
+            <CardContent className="p-8">
+              <form className="flex flex-col items-center gap-6" onSubmit={onUploadSubmit}>
+                <div className="w-full">
+                  <label
+                    htmlFor="video"
+                    className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-200 rounded-xl cursor-pointer bg-gray-50/50 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      <svg className="w-12 h-12 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      <p className="mb-2 text-sm text-gray-500">
+                        <span className="font-semibold text-primary">اضغط لرفع الفيديو</span>
+                      </p>
+                      <p className="text-xs text-gray-400">MP4, MOV, AVI</p>
+                    </div>
+                    <input
+                      id="video"
+                      type="file"
+                      accept="video/*"
+                      className="hidden"
+                      onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                    />
+                  </label>
+                  {file && (
+                    <p className="mt-3 text-sm text-center text-green-600 font-medium">
+                      تم اختيار: {file.name}
+                    </p>
+                  )}
+                </div>
+                <Button type="submit" disabled={!file} size="lg" className="w-full max-w-xs">
+                  متابعة
                 </Button>
-                {error ? <p className="text-sm text-destructive">{error}</p> : null}
+                {error && <p className="text-sm text-destructive">{error}</p>}
               </form>
             </CardContent>
           </Card>
-        ) : null}
+        )}
 
-        {screen === "form" ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>الأسئلة التسويقية</CardTitle>
-              <CardDescription>اختر الإجابات المناسبة لتحسين النتائج.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm text-muted-foreground">
-                  <span>الخطوة {step} من 3</span>
-                  <span>{Math.round((step / 3) * 100)}%</span>
+        {/* Form Screen - One Question Per Step */}
+        {screen === "form" && (
+          <Card className="shadow-lg border-0 bg-white">
+            <CardContent className="p-8 space-y-8">
+              {/* Progress */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">السؤال {step} من {totalSteps}</span>
+                  <span className="font-medium text-primary">{Math.round((step / totalSteps) * 100)}%</span>
                 </div>
-                <Progress value={(step / 3) * 100} />
+                <Progress value={(step / totalSteps) * 100} className="h-2" />
               </div>
-              {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-              {step === 1 ? (
-                <div className="space-y-5">
-                  <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">
-                      على أي منصة ستنشر الفيديو؟
-                    </p>
-                    <Select
-                      value={platform}
-                      onValueChange={(value) => {
-                        setPlatform(value);
-                        void persistPreferences({ platform: value });
+              {/* Question Title */}
+              <h2 className="text-xl font-semibold text-center text-gray-900">
+                {questionTitles[step]}
+              </h2>
+
+              {error && <p className="text-sm text-destructive text-center">{error}</p>}
+
+              {/* Step 1: Platform */}
+              {step === 1 && (
+                <div className="grid gap-3">
+                  {[
+                    { value: "instagram", label: "إنستغرام ريلز", icon: "📸" },
+                    { value: "tiktok", label: "تيك توك", icon: "🎵" },
+                    { value: "youtube", label: "يوتيوب شورتس", icon: "▶️" },
+                    { value: "snapchat", label: "سناب شات سبوتلايت", icon: "👻" },
+                    { value: "facebook", label: "فيسبوك ريلز", icon: "📘" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => {
+                        setPlatform(option.value);
+                        void persistPreferences({ platform: option.value });
                       }}
+                      className={`flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-right ${
+                        platform === option.value
+                          ? "border-primary bg-primary/5"
+                          : "border-gray-100 hover:border-gray-200 bg-gray-50/50"
+                      }`}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="اختر المنصة" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="instagram">إنستغرام ريلز</SelectItem>
-                        <SelectItem value="tiktok">تيك توك</SelectItem>
-                        <SelectItem value="youtube">يوتيوب شورتس</SelectItem>
-                        <SelectItem value="snapchat">سناب شات سبوتلايت</SelectItem>
-                        <SelectItem value="facebook">فيسبوك ريلز</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">
-                      ما المدة المفضلة للمقطع؟ (30-90 ثانية)
-                    </p>
-                    <Select
-                      value={String(preferredDuration)}
-                      onValueChange={(value) => {
-                        const duration = Number(value);
+                      <span className="text-2xl">{option.icon}</span>
+                      <span className="font-medium">{option.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Step 2: Duration */}
+              {step === 2 && (
+                <div className="grid grid-cols-3 gap-3">
+                  {[30, 45, 60, 75, 90].map((duration) => (
+                    <button
+                      key={duration}
+                      type="button"
+                      onClick={() => {
                         setPreferredDuration(duration);
                         void persistPreferences({ preferredDuration: duration });
                       }}
+                      className={`p-4 rounded-xl border-2 transition-all ${
+                        preferredDuration === duration
+                          ? "border-primary bg-primary/5"
+                          : "border-gray-100 hover:border-gray-200 bg-gray-50/50"
+                      }`}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="اختر المدة" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="30">30 ثانية</SelectItem>
-                        <SelectItem value="45">45 ثانية</SelectItem>
-                        <SelectItem value="60">60 ثانية</SelectItem>
-                        <SelectItem value="75">75 ثانية</SelectItem>
-                        <SelectItem value="90">90 ثانية</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      <span className="text-2xl font-bold text-gray-900">{duration}</span>
+                      <span className="block text-sm text-muted-foreground">ثانية</span>
+                    </button>
+                  ))}
                 </div>
-              ) : null}
+              )}
 
-              {step === 2 ? (
-                <div className="space-y-5">
-                  <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">من هو الجمهور المستهدف؟</p>
-                    <Select
-                      value={audience}
-                      onValueChange={(value) => {
-                        setAudience(value);
-                        void persistPreferences({ audience: value });
+              {/* Step 3: Audience */}
+              {step === 3 && (
+                <div className="grid gap-3">
+                  {[
+                    { value: "شباب 18-30", icon: "👥" },
+                    { value: "رواد أعمال", icon: "💼" },
+                    { value: "مهتمون بالتطوير الذاتي", icon: "🚀" },
+                    { value: "طلاب جامعات", icon: "🎓" },
+                    { value: "مهنيون في التقنية", icon: "💻" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => {
+                        setAudience(option.value);
+                        void persistPreferences({ audience: option.value });
                       }}
+                      className={`flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-right ${
+                        audience === option.value
+                          ? "border-primary bg-primary/5"
+                          : "border-gray-100 hover:border-gray-200 bg-gray-50/50"
+                      }`}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="اختر الجمهور" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="شباب 18-30">شباب 18-30</SelectItem>
-                        <SelectItem value="رواد أعمال">رواد أعمال</SelectItem>
-                        <SelectItem value="مهتمون بالتطوير الذاتي">
-                          مهتمون بالتطوير الذاتي
-                        </SelectItem>
-                        <SelectItem value="طلاب جامعات">طلاب جامعات</SelectItem>
-                        <SelectItem value="مهنيون في التقنية">مهنيون في التقنية</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">ما النبرة الأنسب للمقطع؟</p>
-                    <Select
-                      value={tone}
-                      onValueChange={(value) => {
-                        setTone(value);
-                        void persistPreferences({ tone: value });
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="اختر النبرة" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ملهم">ملهم</SelectItem>
-                        <SelectItem value="تعليمي">تعليمي</SelectItem>
-                        <SelectItem value="حماسي">حماسي</SelectItem>
-                        <SelectItem value="هادئ">هادئ</SelectItem>
-                        <SelectItem value="عملي">عملي ومباشر</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      <span className="text-2xl">{option.icon}</span>
+                      <span className="font-medium">{option.value}</span>
+                    </button>
+                  ))}
                 </div>
-              ) : null}
+              )}
 
-              {step === 3 ? (
-                <div className="space-y-5">
-                  <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">أسلوب الافتتاح (الهوك)؟</p>
-                    <Select
-                      value={hookStyle}
-                      onValueChange={(value) => {
-                        setHookStyle(value);
-                        void persistPreferences({ hookStyle: value });
+              {/* Step 4: Tone */}
+              {step === 4 && (
+                <div className="grid gap-3">
+                  {[
+                    { value: "ملهم", icon: "✨" },
+                    { value: "تعليمي", icon: "📚" },
+                    { value: "حماسي", icon: "🔥" },
+                    { value: "هادئ", icon: "🌿" },
+                    { value: "عملي", label: "عملي ومباشر", icon: "🎯" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => {
+                        setTone(option.value);
+                        void persistPreferences({ tone: option.value });
                       }}
+                      className={`flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-right ${
+                        tone === option.value
+                          ? "border-primary bg-primary/5"
+                          : "border-gray-100 hover:border-gray-200 bg-gray-50/50"
+                      }`}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="اختر الأسلوب" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="سؤال مباشر">سؤال مباشر</SelectItem>
-                        <SelectItem value="رقم قوي">رقم قوي أو إحصائية</SelectItem>
-                        <SelectItem value="وعد سريع">وعد بنتيجة سريعة</SelectItem>
-                        <SelectItem value="قصة قصيرة">قصة قصيرة</SelectItem>
-                        <SelectItem value="تنبيه أو تحذير">تنبيه أو تحذير</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                      ما أهم المحاور التي تريد التركيز عليها؟
-                    </p>
-                    <div className="grid gap-3 md:grid-cols-2">
-                      {[
-                        "التحفيز الذاتي",
-                        "إدارة الوقت",
-                        "التركيز والإنتاجية",
-                        "القيادة والعمل الجماعي",
-                        "التجارب والقصص الواقعية",
-                        "النصائح العملية",
-                        "التسويق والمبيعات",
-                        "الصحة النفسية"
-                      ].map((topic) => (
-                        <label
-                          key={topic}
-                          className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm"
-                        >
-                          <Checkbox
-                            checked={keyTopics.includes(topic)}
-                            onCheckedChange={(checked) => {
-                              const next = checked === true
-                                ? [...keyTopics, topic]
-                                : keyTopics.filter((item) => item !== topic);
-                              setKeyTopics(next);
-                              void persistPreferences({ keyTopics: next.join(", ") });
-                            }}
-                          />
-                          <span>{topic}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">هل تريد دعوة للفعل محددة؟</p>
-                    <Select
-                      value={callToAction}
-                      onValueChange={(value) => {
-                        setCallToAction(value);
-                        void persistPreferences({ callToAction: value });
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="اختر دعوة للفعل" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="شارك مع صديق">شارك مع صديق</SelectItem>
-                        <SelectItem value="احفظ المقطع للعودة له">
-                          احفظ المقطع للعودة له
-                        </SelectItem>
-                        <SelectItem value="اكتب رأيك في التعليقات">
-                          اكتب رأيك في التعليقات
-                        </SelectItem>
-                        <SelectItem value="تابعنا للمزيد">تابعنا للمزيد</SelectItem>
-                        <SelectItem value="طبّق النصيحة اليوم">طبّق النصيحة اليوم</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      <span className="text-2xl">{option.icon}</span>
+                      <span className="font-medium">{option.label || option.value}</span>
+                    </button>
+                  ))}
                 </div>
-              ) : null}
+              )}
 
-              <div className="flex items-center justify-between">
-                {step > 1 ? (
+              {/* Step 5: Hook Style */}
+              {step === 5 && (
+                <div className="grid gap-3">
+                  {[
+                    { value: "سؤال مباشر", icon: "❓" },
+                    { value: "رقم قوي", label: "رقم قوي أو إحصائية", icon: "📊" },
+                    { value: "وعد سريع", label: "وعد بنتيجة سريعة", icon: "⚡" },
+                    { value: "قصة قصيرة", icon: "📖" },
+                    { value: "تنبيه أو تحذير", icon: "⚠️" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => {
+                        setHookStyle(option.value);
+                        void persistPreferences({ hookStyle: option.value });
+                      }}
+                      className={`flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-right ${
+                        hookStyle === option.value
+                          ? "border-primary bg-primary/5"
+                          : "border-gray-100 hover:border-gray-200 bg-gray-50/50"
+                      }`}
+                    >
+                      <span className="text-2xl">{option.icon}</span>
+                      <span className="font-medium">{option.label || option.value}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Step 6: Key Topics */}
+              {step === 6 && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {[
+                    { value: "التحفيز الذاتي", icon: "💪" },
+                    { value: "إدارة الوقت", icon: "⏰" },
+                    { value: "التركيز والإنتاجية", icon: "🎯" },
+                    { value: "القيادة والعمل الجماعي", icon: "👥" },
+                    { value: "التجارب والقصص الواقعية", icon: "📝" },
+                    { value: "النصائح العملية", icon: "💡" },
+                    { value: "التسويق والمبيعات", icon: "📈" },
+                    { value: "الصحة النفسية", icon: "🧠" },
+                  ].map((topic) => (
+                    <button
+                      key={topic.value}
+                      type="button"
+                      onClick={() => {
+                        const next = keyTopics.includes(topic.value)
+                          ? keyTopics.filter((item) => item !== topic.value)
+                          : [...keyTopics, topic.value];
+                        setKeyTopics(next);
+                        void persistPreferences({ keyTopics: next.join(", ") });
+                      }}
+                      className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-right ${
+                        keyTopics.includes(topic.value)
+                          ? "border-primary bg-primary/5"
+                          : "border-gray-100 hover:border-gray-200 bg-gray-50/50"
+                      }`}
+                    >
+                      <span className="text-xl">{topic.icon}</span>
+                      <span className="font-medium text-sm">{topic.value}</span>
+                      {keyTopics.includes(topic.value) && (
+                        <span className="mr-auto text-primary">✓</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Step 7: Call to Action */}
+              {step === 7 && (
+                <div className="grid gap-3">
+                  {[
+                    { value: "شارك مع صديق", icon: "🔗" },
+                    { value: "احفظ المقطع للعودة له", icon: "🔖" },
+                    { value: "اكتب رأيك في التعليقات", icon: "💬" },
+                    { value: "تابعنا للمزيد", icon: "➕" },
+                    { value: "طبّق النصيحة اليوم", icon: "✅" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => {
+                        setCallToAction(option.value);
+                        void persistPreferences({ callToAction: option.value });
+                      }}
+                      className={`flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-right ${
+                        callToAction === option.value
+                          ? "border-primary bg-primary/5"
+                          : "border-gray-100 hover:border-gray-200 bg-gray-50/50"
+                      }`}
+                    >
+                      <span className="text-2xl">{option.icon}</span>
+                      <span className="font-medium">{option.value}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Navigation */}
+              <div className="flex items-center justify-between pt-4">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setStep((current) => Math.max(1, current - 1))}
+                  disabled={step === 1}
+                  className={step === 1 ? "invisible" : ""}
+                >
+                  السابق
+                </Button>
+                {step < totalSteps ? (
                   <Button
                     type="button"
-                    variant="ghost"
-                    onClick={() => setStep((current) => Math.max(1, current - 1))}
-                  >
-                    السابق
-                  </Button>
-                ) : (
-                  <span />
-                )}
-                {step < 3 ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => setStep((current) => Math.min(3, current + 1))}
+                    onClick={() => setStep((current) => Math.min(totalSteps, current + 1))}
                   >
                     التالي
                   </Button>
@@ -456,51 +517,63 @@ export default function HomePage() {
               </div>
             </CardContent>
           </Card>
-        ) : null}
+        )}
 
-        {screen === "loading" ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>نحضّر مقاطعك الآن</CardTitle>
-              <CardDescription>نحن نجهّز الفيديوهات المناسبة لك الآن.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <Progress value={66} />
-                <p className="text-sm text-muted-foreground">
+        {/* Loading Screen */}
+        {screen === "loading" && (
+          <Card className="shadow-lg border-0 bg-white">
+            <CardContent className="p-12 text-center space-y-6">
+              <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
+                <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin" />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-xl font-semibold text-gray-900">نحضّر مقاطعك الآن</h2>
+                <p className="text-muted-foreground">
                   {status || "يرجى الانتظار قليلاً..."}
                 </p>
               </div>
+              <Progress value={66} className="max-w-xs mx-auto" />
             </CardContent>
           </Card>
-        ) : null}
+        )}
 
-        {screen === "results" ? (
-          <section className="space-y-4">
-            <h2 className="text-xl font-semibold">المقاطع الجاهزة</h2>
+        {/* Results Screen */}
+        {screen === "results" && (
+          <section className="space-y-6">
+            <div className="text-center space-y-2">
+              <h2 className="text-2xl font-bold text-gray-900">المقاطع جاهزة!</h2>
+              <p className="text-muted-foreground">اختر المقطع الذي يعجبك للمعاينة والتحميل</p>
+            </div>
             {clips.length === 0 ? (
-              <p className="text-sm text-muted-foreground">لم يتم إنشاء أي مقاطع بعد.</p>
+              <p className="text-sm text-muted-foreground text-center">لم يتم إنشاء أي مقاطع بعد.</p>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {clips.map((clip) => {
                   const previewUrl = `/preview?url=${encodeURIComponent(clip.url)}&title=${encodeURIComponent(clip.title)}&duration=${Math.round(clip.duration)}&thumbnail=${encodeURIComponent(clip.thumbnail)}`;
                   return (
-                    <Card key={clip.url} className="overflow-hidden">
-                      <div className="aspect-video bg-gray-100 relative">
+                    <Card key={clip.url} className="overflow-hidden shadow-lg border-0 bg-white group">
+                      <div className="aspect-video bg-gray-100 relative overflow-hidden">
                         <img
                           src={clip.thumbnail}
                           alt={clip.title}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-cover transition-transform group-hover:scale-105"
                         />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                          <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <svg className="w-5 h-5 text-gray-900 mr-[-2px]" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M8 5v14l11-7z" />
+                            </svg>
+                          </div>
+                        </div>
                       </div>
-                      <CardHeader className="pt-3">
-                        <CardTitle className="text-base">{clip.title}</CardTitle>
-                        <CardDescription>
-                          المدة: {Math.round(clip.duration)} ثانية
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <Button asChild>
+                      <CardContent className="p-4 space-y-3">
+                        <div>
+                          <h3 className="font-semibold text-gray-900 line-clamp-2">{clip.title}</h3>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {Math.round(clip.duration)} ثانية
+                          </p>
+                        </div>
+                        <Button asChild className="w-full">
                           <a href={previewUrl} target="_blank" rel="noopener noreferrer">
                             معاينة وتحميل
                           </a>
@@ -512,7 +585,7 @@ export default function HomePage() {
               </div>
             )}
           </section>
-        ) : null}
+        )}
       </section>
     </main>
   );

@@ -46,16 +46,16 @@ function PreviewContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-4" dir="rtl">
-      <Card className="w-full max-w-3xl bg-gray-800 border-gray-700">
-        <CardHeader className="text-center">
-          <CardTitle className="text-white text-xl">{title}</CardTitle>
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex flex-col items-center justify-center p-4" dir="rtl">
+      <Card className="w-full max-w-3xl shadow-xl border-0 bg-white">
+        <CardHeader className="text-center pb-2">
+          <CardTitle className="text-xl text-gray-900">{title}</CardTitle>
           {duration && (
-            <p className="text-gray-400 text-sm">{duration} ثانية</p>
+            <p className="text-muted-foreground text-sm">{duration} ثانية</p>
           )}
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="aspect-video bg-black rounded-lg overflow-hidden">
+        <CardContent className="space-y-6 p-6">
+          <div className="aspect-video bg-gray-900 rounded-xl overflow-hidden shadow-lg">
             <video
               src={url}
               poster={thumbnail || undefined}
@@ -66,14 +66,13 @@ function PreviewContent() {
             />
           </div>
           <div className="flex gap-3 justify-center">
-            <Button onClick={handleDownload} size="lg">
+            <Button onClick={handleDownload} size="lg" className="px-8">
               تحميل المقطع
             </Button>
             <Button
               variant="outline"
               size="lg"
               onClick={() => window.close()}
-              className="bg-transparent text-white border-gray-600 hover:bg-gray-700"
             >
               إغلاق
             </Button>
@@ -88,8 +87,11 @@ export default function PreviewPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-gray-900">
-          <p className="text-white">جاري التحميل...</p>
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="text-center space-y-3">
+            <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+            <p className="text-muted-foreground">جاري التحميل...</p>
+          </div>
         </div>
       }
     >
