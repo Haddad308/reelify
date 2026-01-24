@@ -364,10 +364,10 @@ export default function HomePage() {
                           setFile(null);
                           return;
                         }
-                        const maxSize = 50 * 1024 * 1024;
+                        const maxSize = 100 * 1024 * 1024;
                         if (selectedFile.size > maxSize) {
                           setFile(null);
-                          setError("حجم الفيديو أكبر من 50 ميجابايت. يرجى اختيار ملف أصغر.");
+                          setError("حجم الفيديو أكبر من 100 ميجابايت. يرجى اختيار ملف أصغر.");
                           return;
                         }
                         setError("");
@@ -376,7 +376,7 @@ export default function HomePage() {
                     />
                   </label>
                   <p className="mt-2 text-xs text-muted-foreground text-center">
-                    الحد الأقصى لحجم الفيديو 50MB
+                    الحد الأقصى لحجم الفيديو 100MB
                   </p>
                   {file && (
                     <div className="mt-4 p-4 rounded-xl bg-primary/5 border border-primary/20 animate-fade-in-scale">
