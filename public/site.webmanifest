@@ -1,0 +1,18 @@
+{
+  "name": "Realify",
+  "short_name": "Realify",
+  "description": "حوّل الفيديوهات العربية الطويلة إلى ريلز قصيرة احترافية.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fdfcf9",
+  "theme_color": "#14b8a6",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
