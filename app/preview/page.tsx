@@ -1,9 +1,11 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ReelEditor } from "@/components/reel-editor/ReelEditor";
+import { ReelClipInput, ReelExportResult } from "@/types";
 
 function PreviewContent() {
   const searchParams = useSearchParams();
@@ -16,6 +18,40 @@ function PreviewContent() {
   const tags = tagsParam ? tagsParam.split(",").filter(Boolean) : [];
   const transcript = searchParams.get("transcript") || "";
   const [isPortrait, setIsPortrait] = useState<boolean | null>(null);
+  const [mode, setMode] = useState<"preview" | "edit">("preview");
+
+  // Convert preview data to ReelClipInput format
+  const clipData: ReelClipInput | null = useMemo(() => {
+    if (!url) return null;
+
+    const durationNum = duration ? parseFloat(duration) : 0;
+    
+    // Parse transcript into segments if available
+    const segments = transcript
+      ? transcript.split(/[.!?،؛]+/).filter(s => s.trim().length > 0).map((text, index, arr) => {
+          const segmentDuration = durationNum / Math.max(arr.length, 1);
+          return {
+            text: text.trim(),
+            start: index * segmentDuration,
+            end: (index + 1) * segmentDuration,
+            language: /[\u0600-\u06FF]/.test(text) ? 'ar' as const : 'en' as const,
+          };
+        })
+      : [];
+
+    return {
+      clipId: `clip-${Date.now()}`,
+      videoSourceUrl: url,
+      sourceVideoDuration: durationNum || 60, // Default to 60 seconds if not provided
+      startTime: 0,
+      endTime: durationNum || 60,
+      transcription: segments.length > 0 ? { segments } : undefined,
+      metadata: {
+        title,
+        description: transcript,
+      },
+    };
+  }, [url, duration, transcript, title]);
 
   if (!url) {
     return (
@@ -88,6 +124,50 @@ function PreviewContent() {
     URL.revokeObjectURL(downloadUrl);
   };
 
+  const handleExportSuccess = (result: ReelExportResult) => {
+    // Download the exported video
+    const a = document.createElement("a");
+    a.href = result.videoUrl;
+    a.download = `${title}-edited.mp4`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(result.videoUrl);
+  };
+
+  const handleExportError = (error: Error) => {
+    console.error("Export error:", error);
+    alert(`Export failed: ${error.message}`);
+  };
+
+  // Show editor mode
+  if (mode === "edit" && clipData) {
+    return (
+      <div className="min-h-screen bg-gradient-warm" dir="rtl">
+        <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-border shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <h2 className="text-xl font-bold text-foreground">محرر الفيديو</h2>
+            <Button
+              onClick={() => setMode("preview")}
+              variant="outline"
+              className="bg-gradient-teal hover:shadow-teal transition-all duration-200"
+            >
+              العودة للمعاينة
+            </Button>
+          </div>
+        </div>
+        <ReelEditor
+          clipData={clipData}
+          theme="dark"
+          aspectRatio="9:16"
+          exportQuality="medium"
+          onExportSuccess={handleExportSuccess}
+          onExportError={handleExportError}
+        />
+      </div>
+    );
+  }
+
   const videoFitClass = isPortrait === false ? "object-contain" : "object-cover";
   const videoWrapperClass = `aspect-[9/16] relative ${
     isPortrait === false ? "bg-black" : "bg-gray-900"
@@ -96,6 +176,31 @@ function PreviewContent() {
   return (
     <div className="min-h-screen bg-gradient-warm py-10 px-4" dir="rtl">
       <div className="max-w-4xl mx-auto space-y-8">
+        {/* Mode Toggle */}
+        <div className="flex justify-center">
+          <Card className="shadow-card border-0 bg-gradient-card animate-fade-in">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-center gap-4">
+                <Button
+                  onClick={() => setMode("preview")}
+                  variant={mode === "preview" ? "default" : "outline"}
+                  className={mode === "preview" ? "bg-gradient-teal hover:shadow-teal" : ""}
+                >
+                  معاينة
+                </Button>
+                <Button
+                  onClick={() => setMode("edit")}
+                  variant={mode === "edit" ? "default" : "outline"}
+                  className={mode === "edit" ? "bg-gradient-teal hover:shadow-teal" : ""}
+                  disabled={!clipData}
+                >
+                  تحرير
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Video Player - 9:16 Vertical Format */}
         <div className="flex justify-center">
           <Card className="shadow-card border-0 bg-gradient-card overflow-hidden animate-fade-in hover:shadow-card-hover transition-all duration-500 w-full max-w-md">

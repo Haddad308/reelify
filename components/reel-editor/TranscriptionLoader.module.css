@@ -1,0 +1,110 @@
+.container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.8);
+  z-index: 1000;
+}
+
+.loadingCard,
+.errorCard {
+  background: #1a1a1a;
+  border-radius: 12px;
+  padding: 40px;
+  max-width: 500px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 20px;
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #4a9eff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.errorIcon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0 0 12px 0;
+}
+
+.message {
+  font-size: 16px;
+  color: #b0b0b0;
+  margin: 0 0 24px 0;
+  line-height: 1.5;
+}
+
+.errorMessage {
+  font-size: 14px;
+  color: #ff6b6b;
+  margin: 0 0 24px 0;
+  padding: 12px;
+  background: rgba(255, 107, 107, 0.1);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 107, 107, 0.3);
+}
+
+.buttonGroup {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.retryButton,
+.skipButton {
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.retryButton {
+  background: #4a9eff;
+  color: #ffffff;
+}
+
+.retryButton:hover {
+  background: #3a8eef;
+  transform: translateY(-1px);
+}
+
+.skipButton {
+  background: transparent;
+  color: #b0b0b0;
+  border: 1px solid #404040;
+}
+
+.skipButton:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+}
+
+.retryButton:active,
+.skipButton:active {
+  transform: translateY(0);
+}
