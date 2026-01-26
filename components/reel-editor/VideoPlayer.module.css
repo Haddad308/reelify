@@ -1,0 +1,165 @@
+.container {
+  position: relative;
+  width: 100%;
+  max-width: 1080px;
+  background: #000000;
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+.videoWrapper {
+  position: relative;
+  flex: 1;
+  cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  aspect-ratio: 9 / 16;
+  overflow: hidden;
+  background: #000;
+  border-radius: 16px 16px 0 0;
+}
+
+.video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.loading,
+.error {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #fff;
+  text-align: center;
+  z-index: 1;
+}
+
+.error {
+  color: #ff4444;
+}
+
+.errorUrl {
+  color: #ff8888;
+  word-break: break-all;
+  font-family: monospace;
+}
+
+.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 16px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent);
+}
+
+.timecode {
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+
+.controls {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #000000;
+  position: relative;
+  flex-shrink: 0;
+  height: 56px;
+  border-radius: 0 0 16px 16px;
+}
+
+.controlButton {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  color: #999;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 21;
+  visibility: visible !important;
+  opacity: 1 !important;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.controlButton:hover {
+  background: #1a1a1a;
+  color: #fff;
+}
+
+.controlButton:active {
+  background: #0a0a0a;
+  transform: scale(0.95);
+}
+
+.playButton {
+  width: 36px;
+  height: 36px;
+  background: #4a90e2;
+  color: #fff;
+}
+
+.playButton:hover {
+  background: #357abd;
+  transform: scale(1.05);
+}
+
+.playButton:active {
+  background: #357abd;
+  transform: scale(1);
+}
+
+.timeDisplay {
+  display: flex;
+  align-items: baseline;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: #999;
+  user-select: none;
+}
+
+.currentTime {
+  font-weight: 500;
+  color: #999;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.separator {
+  margin: 0 4px;
+  color: #666;
+  font-weight: 400;
+}
+
+.totalTime {
+  color: #999;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}

@@ -1,0 +1,227 @@
+.container {
+  padding: 20px;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.timeLabels {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  font-size: 11px;
+  color: #666;
+  font-family: 'Courier New', monospace;
+}
+
+.timeLabel {
+  font-weight: 500;
+}
+
+.trackContainer {
+  position: relative;
+  margin-bottom: 16px;
+}
+
+.track {
+  position: relative;
+  height: 60px;
+  background: #f0f0f0;
+  border-radius: 6px;
+  overflow: visible;
+}
+
+.fullTrack {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  background: linear-gradient(to right, #e0e0e0 0%, #d0d0d0 100%);
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+.trimRegion {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: rgba(74, 144, 226, 0.2);
+  border-radius: 6px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Marker sliders - span full width */
+.startMarkerSlider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  z-index: 4;
+  pointer-events: none; /* Disable container pointer events - only thumb is interactive */
+  display: flex;
+  align-items: center;
+}
+
+.endMarkerSlider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  z-index: 3;
+  pointer-events: none; /* Disable container pointer events - only thumb is interactive */
+  display: flex;
+  align-items: center;
+}
+
+.markerTrack {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  background: transparent;
+  pointer-events: none; /* Disable track clicks - only thumb is draggable */
+}
+
+.markerRange {
+  display: none;
+}
+
+.markerThumb {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 60px;
+  background: #4a90e2;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  cursor: ew-resize;
+  z-index: 5;
+  position: relative;
+  border-radius: 4px;
+  transform: translateX(-50%);
+  pointer-events: auto; /* Enable pointer events only on thumb */
+  touch-action: none; /* Prevent touch scrolling while dragging */
+}
+
+.markerThumb:hover {
+  background: #357abd;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  transform: translateX(-50%) scale(1.05);
+}
+
+.markerThumb:focus {
+  outline: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 0 3px rgba(74, 144, 226, 0.3);
+}
+
+.markerThumb:active {
+  cursor: grabbing;
+}
+
+.startMarker {
+  border-top-left-radius: 6px;
+  border-bottom-left-radius: 6px;
+  border-right: 3px solid #fff;
+}
+
+.endMarker {
+  border-top-right-radius: 6px;
+  border-bottom-right-radius: 6px;
+  border-left: 3px solid #fff;
+}
+
+.markerLine {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 2px;
+  height: 100%;
+  background: #4a90e2;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.markerLabel {
+  font-size: 8px;
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+  pointer-events: none;
+  position: relative;
+  z-index: 1;
+}
+
+/* Playhead indicator (visual only, not interactive) */
+.playheadIndicator {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  z-index: 5;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.playheadLine {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 2px;
+  height: 100%;
+  background: #ff4444;
+  transform: translateX(-50%);
+  box-shadow: 0 0 4px rgba(255, 68, 68, 0.5);
+}
+
+.playheadHead {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  background: #ff4444;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* Info display */
+.infoDisplay {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #e0e0e0;
+  font-size: 12px;
+}
+
+.infoItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.infoLabel {
+  color: #666;
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+}
+
+.infoValue {
+  color: #333;
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  font-size: 13px;
+}
