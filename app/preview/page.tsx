@@ -57,7 +57,14 @@ function PreviewContent() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-warm">
         <Card className="w-full max-w-md shadow-card border-0 bg-gradient-card animate-fade-in">
-          <CardContent className="p-8 text-center space-y-4">
+          <CardContent className="p-8 text-center space-y-6">
+            <div className="flex justify-center">
+              <img
+                src="/Transparent black.png"
+                alt="Reelift logo"
+                className="h-10 w-auto"
+              />
+            </div>
             <div className="w-16 h-16 mx-auto rounded-full bg-red-100 flex items-center justify-center">
               <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -146,11 +153,18 @@ function PreviewContent() {
       <div className="min-h-screen bg-gradient-warm" dir="rtl">
         <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-border shadow-sm">
           <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-            <h2 className="text-xl font-bold text-foreground">محرر الفيديو</h2>
+            <div className="flex items-center gap-3">
+              <img
+                src="/Transparent black.png"
+                alt="Reelift logo"
+                className="h-8 w-auto"
+              />
+              <h2 className="text-xl font-bold text-foreground">محرر الفيديو</h2>
+            </div>
             <Button
               onClick={() => setMode("preview")}
               variant="outline"
-              className="bg-gradient-teal hover:shadow-teal transition-all duration-200"
+              className="bg-gradient-coral text-white border-none hover:shadow-teal transition-all duration-200"
             >
               العودة للمعاينة
             </Button>
@@ -170,12 +184,26 @@ function PreviewContent() {
 
   const videoFitClass = isPortrait === false ? "object-contain" : "object-cover";
   const videoWrapperClass = `aspect-[9/16] relative ${
-    isPortrait === false ? "bg-black" : "bg-gray-900"
+    isPortrait === false ? "bg-black" : "bg-neutral-900"
   }`;
 
   return (
     <div className="min-h-screen bg-gradient-warm py-10 px-4" dir="rtl">
-      <div className="max-w-4xl mx-auto space-y-8">
+      <div className="max-w-4xl mx-auto space-y-8 items-center justify-center">
+        {/* Brand Bar */}
+        <div className="flex justify-center">
+          <div className="inline-flex items-center gap-3 rounded-full bg-white/80 px-5 py-2 shadow-card border border-border/60 backdrop-blur-sm">
+            <img
+              src="/Transparent black.png"
+              alt="Reelift logo"
+              className="h-8 w-auto"
+            />
+            <span className="hidden text-sm font-semibold text-muted-foreground sm:inline">
+              معاينة وتحرير الريلز
+            </span>
+          </div>
+        </div>
+
         {/* Mode Toggle */}
         <div className="flex justify-center">
           <Card className="shadow-card border-0 bg-gradient-card animate-fade-in">
@@ -203,7 +231,7 @@ function PreviewContent() {
 
         {/* Video Player - 9:16 Vertical Format */}
         <div className="flex justify-center">
-          <Card className="shadow-card border-0 bg-gradient-card overflow-hidden animate-fade-in hover:shadow-card-hover transition-all duration-500 w-full max-w-md">
+          <Card className="shadow-card border-0 bg-gradient-card overflow-hidden animate-fade-in hover:shadow-card-hover transition-all duration-500 w-full max-w-md rounded-2xl">
             <div className={videoWrapperClass}>
               <video
                 src={url}

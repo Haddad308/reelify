@@ -4,27 +4,44 @@
 
 @layer base {
   :root {
-    /* Teal/Emerald Primary Palette */
-    --background: 40 33% 99%;
-    --foreground: 220 20% 15%;
+    /* Reelify Coral Brand Palette */
+    /* Brand hex reference:
+       --brand-primary:   #FF6B7A (coral pink)
+       --brand-secondary: #FF8A95 (lighter coral)
+       --brand-dark:      #E5525F (darker coral)
+       --neutral-dark:    #1A1A1A
+       --neutral-light:   #F8F9FA
+       --text-primary:    #1A1A1A
+       --text-secondary:  #6B6B6B
+    */
+
+    /* Brand HSL tokens (Tailwind expects H / S% / L%) */
+    --background: 210 17% 98%; /* neutral light */
+    --foreground: 0 0% 10%; /* text primary */
     --card: 0 0% 100%;
-    --card-foreground: 220 20% 15%;
+    --card-foreground: 0 0% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 220 20% 15%;
-    --primary: 160 84% 39%;
+    --popover-foreground: 0 0% 10%;
+
+    /* Primary coral scale */
+    --primary: 354 100% 71%; /* #FF6B7A */
     --primary-foreground: 0 0% 100%;
-    --secondary: 45 30% 96%;
-    --secondary-foreground: 220 20% 15%;
-    --muted: 45 20% 95%;
-    --muted-foreground: 220 10% 45%;
-    --accent: 24 95% 53%;
+    --secondary: 354 100% 76%; /* #FF8A95 */
+    --secondary-foreground: 0 0% 10%;
+
+    /* Neutrals */
+    --muted: 210 15% 95%;
+    --muted-foreground: 0 0% 42%; /* text secondary */
+    --accent: 354 100% 71%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 40 20% 90%;
-    --input: 40 20% 90%;
-    --ring: 160 84% 39%;
-    --radius: 1rem;
+    --border: 210 16% 90%;
+    --input: 210 16% 90%;
+    --ring: 354 100% 71%;
+
+    /* Rounded corners: 12px base radius */
+    --radius: 0.75rem;
   }
 
   * {
@@ -33,9 +50,34 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: "Inter", "Segoe UI", "Tahoma", "Arial", sans-serif;
+    font-family: "Inter", "Helvetica Neue", "SF Pro Display", -apple-system,
+      system-ui, "Segoe UI", "Tahoma", "Arial", sans-serif;
     font-size: 16px;
     line-height: 1.6;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: "Inter", "Helvetica Neue", "SF Pro Display", -apple-system,
+      system-ui, "Segoe UI", "Tahoma", "Arial", sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: hsl(var(--foreground));
+  }
+
+  p,
+  span,
+  li {
+    font-weight: 400;
+    color: hsl(var(--muted-foreground));
+  }
+
+  strong,
+  b {
+    font-weight: 600;
+    color: hsl(var(--foreground));
   }
 }
 
@@ -149,34 +191,60 @@
 
   /* Gradient Backgrounds */
   .bg-gradient-warm {
-    background: linear-gradient(135deg, hsl(40 33% 99%) 0%, hsl(45 40% 97%) 100%);
+    background: radial-gradient(
+        circle at top left,
+        hsla(354 100% 88% / 0.25),
+        transparent 55%
+      ),
+      radial-gradient(
+        circle at bottom right,
+        hsla(354 100% 88% / 0.4),
+        transparent 60%
+      ),
+      linear-gradient(135deg, hsl(0 0% 100%) 0%, hsl(210 17% 98%) 100%);
   }
 
   .bg-gradient-teal {
-    background: linear-gradient(135deg, hsl(160 84% 39%) 0%, hsl(170 80% 45%) 100%);
+    /* Deprecated naming kept for backwards compatibility; now uses coral */
+    background: linear-gradient(
+      135deg,
+      hsl(354 100% 71%) 0%,
+      hsl(354 100% 65%) 45%,
+      hsl(354 72% 56%) 100%
+    );
   }
 
   .bg-gradient-coral {
-    background: linear-gradient(135deg, hsl(24 95% 53%) 0%, hsl(35 95% 58%) 100%);
+    background: linear-gradient(
+      135deg,
+      hsl(354 100% 76%) 0%,
+      hsl(354 100% 71%) 40%,
+      hsl(354 72% 56%) 100%
+    );
   }
 
   .bg-gradient-card {
-    background: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(45 30% 98%) 100%);
+    background: linear-gradient(
+      180deg,
+      hsl(0 0% 100%) 0%,
+      hsl(210 17% 99%) 40%,
+      hsl(210 17% 97%) 100%
+    );
   }
 
   /* Enhanced Shadows */
   .shadow-teal {
-    box-shadow: 0 10px 40px -10px rgba(20, 184, 166, 0.2);
+    box-shadow: 0 10px 40px -10px rgba(255, 107, 122, 0.25);
   }
 
   .shadow-warm {
-    box-shadow: 0 10px 40px -10px rgba(251, 146, 60, 0.15);
+    box-shadow: 0 10px 40px -10px rgba(229, 82, 95, 0.25);
   }
 
   .shadow-card {
     box-shadow: 
-      0 4px 6px -1px rgba(0, 0, 0, 0.05),
-      0 10px 30px -5px rgba(0, 0, 0, 0.08);
+      0 4px 10px -2px rgba(0, 0, 0, 0.06),
+      0 18px 40px -12px rgba(0, 0, 0, 0.12);
   }
 
   .shadow-card-hover {
@@ -205,6 +273,29 @@
 
   /* Progress Bar Gradient */
   .progress-gradient {
-    background: linear-gradient(90deg, hsl(160 84% 39%) 0%, hsl(24 95% 53%) 100%);
+    background: linear-gradient(
+      90deg,
+      hsl(354 100% 71%) 0%,
+      hsl(354 100% 76%) 35%,
+      hsl(354 72% 56%) 100%
+    );
+  }
+
+  /* Smile / curved accent element */
+  .smile-accent {
+    position: relative;
+  }
+
+  .smile-accent::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -0.9rem;
+    transform: translateX(-50%);
+    width: 7rem;
+    height: 1.8rem;
+    border-bottom: 4px solid hsl(var(--primary));
+    border-radius: 9999px;
+    box-shadow: 0 4px 12px rgba(255, 107, 122, 0.4);
   }
 }
