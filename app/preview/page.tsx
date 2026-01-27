@@ -190,20 +190,6 @@ function PreviewContent() {
   return (
     <div className="min-h-screen bg-gradient-warm py-10 px-4" dir="rtl">
       <div className="max-w-4xl mx-auto space-y-8 items-center justify-center">
-        {/* Brand Bar */}
-        <div className="flex justify-center">
-          <div className="inline-flex items-center gap-3 rounded-full bg-white/80 px-5 py-2 shadow-card border border-border/60 backdrop-blur-sm">
-            <img
-              src="/Transparent black.png"
-              alt="Reelift logo"
-              className="h-8 w-auto"
-            />
-            <span className="hidden text-sm font-semibold text-muted-foreground sm:inline">
-              معاينة وتحرير الريلز
-            </span>
-          </div>
-        </div>
-
         {/* Mode Toggle */}
         <div className="flex justify-center">
           <Card className="shadow-card border-0 bg-gradient-card animate-fade-in">

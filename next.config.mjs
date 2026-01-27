@@ -22,24 +22,10 @@ const nextConfig = {
   experimental: {
     optimizePackageImports: ['@ffmpeg/ffmpeg', '@ffmpeg/util'],
   },
-  // Headers for FFmpeg.wasm files
-  async headers() {
-    return [
-      {
-        source: '/ffmpeg/:path*',
-        headers: [
-          {
-            key: 'Cross-Origin-Embedder-Policy',
-            value: 'require-corp',
-          },
-          {
-            key: 'Cross-Origin-Opener-Policy',
-            value: 'same-origin',
-          },
-        ],
-      },
-    ];
-  },
+  // Note: COEP headers removed to allow cross-origin resources (Vercel Blob Storage)
+  // Modern FFmpeg.wasm doesn't require COEP for basic operations
+  // If SharedArrayBuffer is needed in the future, use COEP: credentialless
+  // and ensure all cross-origin resources have proper CORP headers
   // Explicitly use webpack instead of Turbopack for FFmpeg.wasm compatibility
   // Turbopack doesn't support webpack fallbacks yet
 };
