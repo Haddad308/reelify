@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import Image from "next/image";
 
 type ClipItem = {
   title: string;
@@ -379,14 +380,20 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-gradient-warm" dir="rtl">
-      <section className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-6 pb-24 pt-20">
+      <section className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-6 pb-24 pt-10">
+        <div className="flex items-center justify-center">
+          <Image
+            src="/Transparent white1.png"
+            alt="Realify"
+            width={200}
+            height={100}
+          />
+        </div>
+        {/* Brand Bar */}
+
         {/* Header */}
-        <header className="text-center space-y-4 animate-fade-in">
-          <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-5 py-2 text-sm font-semibold text-primary shadow-sm">
-            <span className="h-2.5 w-2.5 rounded-full bg-primary animate-pulse-glow" />
-            Realify
-          </div>
-          <h1 className="text-4xl font-bold tracking-tight text-foreground leading-tight">
+        <header className="text-center space-y-5 animate-fade-in mt-4">
+          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-foreground leading-tight inline-block ">
             اصنع ريلز عربية احترافية
           </h1>
           <p className="text-lg text-muted-foreground max-w-lg mx-auto leading-relaxed">
@@ -760,7 +767,8 @@ export default function HomePage() {
                           onClick={() => {
                             setPlatform(option.value);
                             const recommendedDuration =
-                              recommendedDurationMap[option.value] ?? preferredDuration;
+                              recommendedDurationMap[option.value] ??
+                              preferredDuration;
                             setPreferredDuration(recommendedDuration);
                             void persistPreferences({
                               platform: option.value,
@@ -802,8 +810,9 @@ export default function HomePage() {
                   {step === 2 && (
                     <div className="space-y-4 animate-fade-in">
                       <p className="text-sm text-muted-foreground text-center">
-                        نوصي بمدة {recommendedDurationMap[platform] ?? preferredDuration} ثانية لمنصة{" "}
-                        {platformLabels[platform] ?? "المنصة"}.
+                        نوصي بمدة{" "}
+                        {recommendedDurationMap[platform] ?? preferredDuration}{" "}
+                        ثانية لمنصة {platformLabels[platform] ?? "المنصة"}.
                       </p>
                       <div className="grid grid-cols-3 gap-4">
                         {[30, 45, 60, 75, 90].map((duration, index) => (
@@ -837,7 +846,7 @@ export default function HomePage() {
                   {/* Step 3: Audience */}
                   {step === 3 && (
                     <div className="grid gap-4 animate-fade-in">
-                        {[
+                      {[
                         { value: "شباب 18-30", icon: "👥" },
                         { value: "رواد أعمال", icon: "💼" },
                         { value: "مهتمون بالتطوير الذاتي", icon: "🚀" },
@@ -849,7 +858,7 @@ export default function HomePage() {
                           type="button"
                           onClick={() => {
                             setAudience(option.value);
-                              setAudienceSkipped(false);
+                            setAudienceSkipped(false);
                             void persistPreferences({ audience: option.value });
                           }}
                           className={`flex items-center gap-5 p-5 rounded-2xl border-2 transition-all duration-300 text-right hover:scale-[1.02] active:scale-[0.98] ${
@@ -909,10 +918,11 @@ export default function HomePage() {
                             onClick={() => {
                               setAudience("");
                               setAudienceSkipped(true);
-                              setStep(current => Math.min(totalSteps, current + 1));
+                              setStep(current =>
+                                Math.min(totalSteps, current + 1),
+                              );
                             }}
-                            className="text-primary hover:underline font-medium"
-                          >
+                            className="text-primary hover:underline font-medium">
                             تخطي هذا السؤال
                           </button>
                         </div>
@@ -935,7 +945,7 @@ export default function HomePage() {
                           type="button"
                           onClick={() => {
                             setTone(option.value);
-                              setToneSkipped(false);
+                            setToneSkipped(false);
                             void persistPreferences({ tone: option.value });
                           }}
                           className={`flex items-center gap-5 p-5 rounded-2xl border-2 transition-all duration-300 text-right hover:scale-[1.02] active:scale-[0.98] ${
@@ -995,10 +1005,11 @@ export default function HomePage() {
                             onClick={() => {
                               setTone("");
                               setToneSkipped(true);
-                              setStep(current => Math.min(totalSteps, current + 1));
+                              setStep(current =>
+                                Math.min(totalSteps, current + 1),
+                              );
                             }}
-                            className="text-primary hover:underline font-medium"
-                          >
+                            className="text-primary hover:underline font-medium">
                             تخطي هذا السؤال
                           </button>
                         </div>
@@ -1095,11 +1106,12 @@ export default function HomePage() {
                               if (step >= totalSteps) {
                                 void onStartProcessing();
                               } else {
-                                setStep(current => Math.min(totalSteps, current + 1));
+                                setStep(current =>
+                                  Math.min(totalSteps, current + 1),
+                                );
                               }
                             }}
-                            className="text-primary hover:underline font-medium"
-                          >
+                            className="text-primary hover:underline font-medium">
                             تخطي هذا السؤال
                           </button>
                         </div>
