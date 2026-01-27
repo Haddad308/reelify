@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import Image from "next/image";
 
 type ClipItem = {
   title: string;
@@ -59,26 +60,38 @@ export default function HomePage() {
   const [platform, setPlatform] = useState("instagram");
   const [preferredDuration, setPreferredDuration] = useState(45);
   const [audience, setAudience] = useState("شباب 18-30");
+  const [audienceSkipped, setAudienceSkipped] = useState(false);
   const [tone, setTone] = useState("ملهم");
+  const [toneSkipped, setToneSkipped] = useState(false);
   const [hookStyle, setHookStyle] = useState("سؤال مباشر");
+  const [hookStyleSkipped, setHookStyleSkipped] = useState(false);
   const [keyTopics, setKeyTopics] = useState<string[]>([]);
   const [callToAction, setCallToAction] = useState("شارك مع صديق");
   const [skipQuestions, setSkipQuestions] = useState(false);
   const [thumbnailPortraitMap, setThumbnailPortraitMap] = useState<
     Record<string, boolean>
   >({});
+  const recommendedDurationMap: Record<string, number> = {
+    instagram: 45,
+    tiktok: 60,
+    youtube: 60,
+    snapchat: 30,
+    facebook: 45,
+    linkedin: 45,
+  };
+  const platformLabels: Record<string, string> = {
+    instagram: "إنستغرام ريلز",
+    tiktok: "تيك توك",
+    youtube: "يوتيوب شورتس",
+    snapchat: "سناب شات سبوتلايت",
+    facebook: "فيسبوك ريلز",
+    linkedin: "لينكدإن ريلز",
+  };
 
   const [backgroundResult, setBackgroundResult] = useState<{
     ffmpeg: Awaited<ReturnType<typeof getFfmpeg>>;
     inputName: string;
-    candidates: Array<{
-      title: string;
-      start: number;
-      end: number;
-      category: string;
-      tags: string[];
-    }>;
-    segments: TranscriptSegment[];
+    audioUrl: string;
   } | null>(null);
   const [backgroundError, setBackgroundError] = useState<string>("");
   const [backgroundProcessing, setBackgroundProcessing] = useState(false);
@@ -137,34 +150,11 @@ export default function HomePage() {
         access: "public",
         handleUploadUrl: "/api/upload",
       });
-
-      // Call /api/process for transcription and Gemini analysis
-      const response = await fetch("/api/process", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ audioUrl: audioUpload.url }),
-      });
-
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload?.error || "حدث خطأ أثناء التحليل.");
-      }
-
-      const candidates = Array.isArray(payload?.clips) ? payload.clips : [];
-      const segments: TranscriptSegment[] = Array.isArray(payload?.segments)
-        ? payload.segments
-        : [];
-
-      if (candidates.length === 0) {
-        throw new Error("لم يتم العثور على مقاطع مناسبة.");
-      }
-
-      // Store results
+      // Store results needed for later processing
       setBackgroundResult({
         ffmpeg,
         inputName,
-        candidates,
-        segments,
+        audioUrl: audioUpload.url,
       });
     } catch (err) {
       console.error("Background processing error:", err);
@@ -220,11 +210,51 @@ export default function HomePage() {
 
       // Check if background result is ready
       if (!backgroundResultRef.current) {
-        throw new Error("لم يتم تحليل الفيديو بعد. يرجى المحاولة مرة أخرى.");
+        throw new Error("لم يتم تجهيز الفيديو بعد. يرجى المحاولة مرة أخرى.");
       }
 
-      const { ffmpeg, inputName, candidates, segments } =
-        backgroundResultRef.current;
+      const { ffmpeg, inputName, audioUrl } = backgroundResultRef.current;
+
+      // Build session preferences based on answered vs skipped questions
+      const sessionPreferences: Record<string, unknown> = {};
+
+      // Always include platform and preferred duration as they are required
+      sessionPreferences.platform = platform;
+      sessionPreferences.preferredDuration = preferredDuration;
+
+      if (!audienceSkipped && audience.trim()) {
+        sessionPreferences.audience = audience.trim();
+      }
+
+      if (!toneSkipped && tone.trim()) {
+        sessionPreferences.tone = tone.trim();
+      }
+
+      if (!hookStyleSkipped && hookStyle.trim()) {
+        sessionPreferences.hookStyle = hookStyle.trim();
+      }
+
+      // Call /api/process for transcription and Gemini analysis with preferences
+      setStatus("نحلل المحتوى ونختار أفضل المقاطع...");
+      const response = await fetch("/api/process", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ audioUrl, preferences: sessionPreferences }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.error || "حدث خطأ أثناء التحليل.");
+      }
+
+      const candidates = Array.isArray(payload?.clips) ? payload.clips : [];
+      const segments: TranscriptSegment[] = Array.isArray(payload?.segments)
+        ? payload.segments
+        : [];
+
+      if (candidates.length === 0) {
+        throw new Error("لم يتم العثور على مقاطع مناسبة.");
+      }
 
       // Helper to extract transcript for a specific time range
       const getClipTranscript = (start: number, end: number): string => {
@@ -334,7 +364,7 @@ export default function HomePage() {
     setError("");
     setStatus("");
     // Persist a minimal preference set so the model can infer defaults
-    await persistPreferences({ platform });
+    await persistPreferences({ platform, preferredDuration });
     void onStartProcessing();
   };
 
@@ -350,14 +380,20 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-gradient-warm" dir="rtl">
-      <section className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-6 pb-24 pt-20">
+      <section className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-6 pb-24 pt-10">
+        <div className="flex items-center justify-center">
+          <Image
+            src="/Transparent white1.png"
+            alt="Realify"
+            width={200}
+            height={100}
+          />
+        </div>
+        {/* Brand Bar */}
+
         {/* Header */}
-        <header className="text-center space-y-4 animate-fade-in">
-          <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-5 py-2 text-sm font-semibold text-primary shadow-sm">
-            <span className="h-2.5 w-2.5 rounded-full bg-primary animate-pulse-glow" />
-            Realify
-          </div>
-          <h1 className="text-4xl font-bold tracking-tight text-foreground leading-tight">
+        <header className="text-center space-y-5 animate-fade-in mt-4">
+          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-foreground leading-tight inline-block ">
             اصنع ريلز عربية احترافية
           </h1>
           <p className="text-lg text-muted-foreground max-w-lg mx-auto leading-relaxed">
@@ -568,9 +604,56 @@ export default function HomePage() {
               {!skipQuestions && (
                 <>
                   {/* Question Title */}
-                  <h2 className="text-2xl font-bold text-center text-foreground animate-fade-in">
-                    {questionTitles[step]}
-                  </h2>
+                  <div className="space-y-2">
+                    <h2 className="text-2xl font-bold text-center text-foreground animate-fade-in">
+                      {questionTitles[step]}
+                    </h2>
+                    {/* Question status badge (answered vs skipped) */}
+                    <div className="flex justify-center">
+                      {step === 3 && (
+                        <>
+                          {audienceSkipped && (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-600 border border-red-200">
+                              تم تخطي هذا السؤال
+                            </span>
+                          )}
+                          {!audienceSkipped && audience.trim() && (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              تم اختيار إجابة لهذا السؤال
+                            </span>
+                          )}
+                        </>
+                      )}
+                      {step === 4 && (
+                        <>
+                          {toneSkipped && (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-600 border border-red-200">
+                              تم تخطي هذا السؤال
+                            </span>
+                          )}
+                          {!toneSkipped && tone.trim() && (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              تم اختيار إجابة لهذا السؤال
+                            </span>
+                          )}
+                        </>
+                      )}
+                      {step === 5 && (
+                        <>
+                          {hookStyleSkipped && (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-600 border border-red-200">
+                              تم تخطي هذا السؤال
+                            </span>
+                          )}
+                          {!hookStyleSkipped && hookStyle.trim() && (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              تم اختيار إجابة لهذا السؤال
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
 
                   {error && (
                     <p className="text-sm text-destructive text-center animate-fade-in">
@@ -664,13 +747,33 @@ export default function HomePage() {
                           ),
                           color: "text-blue-600",
                         },
+                        {
+                          value: "linkedin",
+                          label: "لينكدإن ريلز",
+                          icon: (
+                            <svg
+                              className="w-8 h-8 text-[#0A66C2]"
+                              viewBox="0 0 24 24"
+                              fill="currentColor">
+                              <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.35V9h3.414v1.561h.049c.476-.9 1.637-1.85 3.369-1.85 3.602 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 1 1 0-4.124 2.062 2.062 0 0 1 0 4.124zM6.828 20.452H3.84V9h2.988v11.452zM22.225 0H1.771C.792 0 0 .771 0 1.72v20.512C0 23.23.792 24 1.771 24h20.451C23.2 24 24 23.23 24 22.232V1.72C24 .771 23.2 0 22.222 0h.003z" />
+                            </svg>
+                          ),
+                          color: "text-[#0A66C2]",
+                        },
                       ].map((option, index) => (
                         <button
                           key={option.value}
                           type="button"
                           onClick={() => {
                             setPlatform(option.value);
-                            void persistPreferences({ platform: option.value });
+                            const recommendedDuration =
+                              recommendedDurationMap[option.value] ??
+                              preferredDuration;
+                            setPreferredDuration(recommendedDuration);
+                            void persistPreferences({
+                              platform: option.value,
+                              preferredDuration: recommendedDuration,
+                            });
                           }}
                           className={`flex items-center gap-5 p-5 rounded-2xl border-2 transition-all duration-300 text-right hover:scale-[1.02] active:scale-[0.98] ${
                             platform === option.value
@@ -705,31 +808,38 @@ export default function HomePage() {
 
                   {/* Step 2: Duration */}
                   {step === 2 && (
-                    <div className="grid grid-cols-3 gap-4 animate-fade-in">
-                      {[30, 45, 60, 75, 90].map((duration, index) => (
-                        <button
-                          key={duration}
-                          type="button"
-                          onClick={() => {
-                            setPreferredDuration(duration);
-                            void persistPreferences({
-                              preferredDuration: duration,
-                            });
-                          }}
-                          className={`p-6 rounded-2xl border-2 transition-all duration-300 hover:scale-[1.05] active:scale-[0.98] ${
-                            preferredDuration === duration
-                              ? "border-primary bg-primary/10 shadow-teal"
-                              : "border-transparent bg-muted/50 hover:bg-muted hover:border-primary/20"
-                          }`}
-                          style={{ animationDelay: `${index * 0.1}s` }}>
-                          <span className="text-3xl font-bold text-foreground block">
-                            {duration}
-                          </span>
-                          <span className="block text-sm text-muted-foreground mt-1">
-                            ثانية
-                          </span>
-                        </button>
-                      ))}
+                    <div className="space-y-4 animate-fade-in">
+                      <p className="text-sm text-muted-foreground text-center">
+                        نوصي بمدة{" "}
+                        {recommendedDurationMap[platform] ?? preferredDuration}{" "}
+                        ثانية لمنصة {platformLabels[platform] ?? "المنصة"}.
+                      </p>
+                      <div className="grid grid-cols-3 gap-4">
+                        {[30, 45, 60, 75, 90].map((duration, index) => (
+                          <button
+                            key={duration}
+                            type="button"
+                            onClick={() => {
+                              setPreferredDuration(duration);
+                              void persistPreferences({
+                                preferredDuration: duration,
+                              });
+                            }}
+                            className={`p-6 rounded-2xl border-2 transition-all duration-300 hover:scale-[1.05] active:scale-[0.98] ${
+                              preferredDuration === duration
+                                ? "border-primary bg-primary/10 shadow-teal"
+                                : "border-transparent bg-muted/50 hover:bg-muted hover:border-primary/20"
+                            }`}
+                            style={{ animationDelay: `${index * 0.1}s` }}>
+                            <span className="text-3xl font-bold text-foreground block">
+                              {duration}
+                            </span>
+                            <span className="block text-sm text-muted-foreground mt-1">
+                              ثانية
+                            </span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
 
@@ -748,6 +858,7 @@ export default function HomePage() {
                           type="button"
                           onClick={() => {
                             setAudience(option.value);
+                            setAudienceSkipped(false);
                             void persistPreferences({ audience: option.value });
                           }}
                           className={`flex items-center gap-5 p-5 rounded-2xl border-2 transition-all duration-300 text-right hover:scale-[1.02] active:scale-[0.98] ${
@@ -776,6 +887,46 @@ export default function HomePage() {
                           )}
                         </button>
                       ))}
+                      <div className="mt-4 space-y-3">
+                        <label className="block text-sm font-medium text-foreground">
+                          أو اكتب جمهورك المستهدف
+                        </label>
+                        <input
+                          type="text"
+                          value={audience}
+                          onChange={event => {
+                            setAudience(event.target.value);
+                            setAudienceSkipped(false);
+                          }}
+                          onBlur={() => {
+                            const trimmed = audience.trim();
+                            if (trimmed) {
+                              void persistPreferences({ audience: trimmed });
+                            }
+                          }}
+                          placeholder="مثال: أصحاب المشاريع الصغيرة، صناع المحتوى..."
+                          className="w-full rounded-xl border border-border bg-background/80 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        />
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>
+                            {audienceSkipped
+                              ? "تم تخطي هذا السؤال في هذه الجلسة."
+                              : "يمكنك اختيار خيار جاهز أو كتابة جمهورك الخاص."}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAudience("");
+                              setAudienceSkipped(true);
+                              setStep(current =>
+                                Math.min(totalSteps, current + 1),
+                              );
+                            }}
+                            className="text-primary hover:underline font-medium">
+                            تخطي هذا السؤال
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -794,6 +945,7 @@ export default function HomePage() {
                           type="button"
                           onClick={() => {
                             setTone(option.value);
+                            setToneSkipped(false);
                             void persistPreferences({ tone: option.value });
                           }}
                           className={`flex items-center gap-5 p-5 rounded-2xl border-2 transition-all duration-300 text-right hover:scale-[1.02] active:scale-[0.98] ${
@@ -822,6 +974,46 @@ export default function HomePage() {
                           )}
                         </button>
                       ))}
+                      <div className="mt-4 space-y-3">
+                        <label className="block text-sm font-medium text-foreground">
+                          أو اكتب النبرة التي تريدها
+                        </label>
+                        <input
+                          type="text"
+                          value={tone}
+                          onChange={event => {
+                            setTone(event.target.value);
+                            setToneSkipped(false);
+                          }}
+                          onBlur={() => {
+                            const trimmed = tone.trim();
+                            if (trimmed) {
+                              void persistPreferences({ tone: trimmed });
+                            }
+                          }}
+                          placeholder="مثال: ملهم وعفوي، رسمي، قصصي..."
+                          className="w-full rounded-xl border border-border bg-background/80 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        />
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>
+                            {toneSkipped
+                              ? "تم تخطي هذا السؤال في هذه الجلسة."
+                              : "يمكنك اختيار خيار جاهز أو كتابة النبرة التي تناسبك."}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTone("");
+                              setToneSkipped(true);
+                              setStep(current =>
+                                Math.min(totalSteps, current + 1),
+                              );
+                            }}
+                            className="text-primary hover:underline font-medium">
+                            تخطي هذا السؤال
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -848,6 +1040,7 @@ export default function HomePage() {
                           type="button"
                           onClick={() => {
                             setHookStyle(option.value);
+                            setHookStyleSkipped(false);
                             void persistPreferences({
                               hookStyle: option.value,
                             });
@@ -878,6 +1071,51 @@ export default function HomePage() {
                           )}
                         </button>
                       ))}
+                      <div className="mt-4 space-y-3">
+                        <label className="block text-sm font-medium text-foreground">
+                          أو اكتب أسلوب الافتتاح الذي تفضله
+                        </label>
+                        <input
+                          type="text"
+                          value={hookStyle}
+                          onChange={event => {
+                            setHookStyle(event.target.value);
+                            setHookStyleSkipped(false);
+                          }}
+                          onBlur={() => {
+                            const trimmed = hookStyle.trim();
+                            if (trimmed) {
+                              void persistPreferences({ hookStyle: trimmed });
+                            }
+                          }}
+                          placeholder="مثال: قصة شخصية سريعة، سؤال صادم، مشكلة شائعة..."
+                          className="w-full rounded-xl border border-border bg-background/80 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        />
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>
+                            {hookStyleSkipped
+                              ? "تم تخطي هذا السؤال في هذه الجلسة."
+                              : "يمكنك اختيار خيار جاهز أو كتابة أسلوب الافتتاح الذي تريده."}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setHookStyle("");
+                              setHookStyleSkipped(true);
+                              // If this is the last question, skipping should immediately start processing
+                              if (step >= totalSteps) {
+                                void onStartProcessing();
+                              } else {
+                                setStep(current =>
+                                  Math.min(totalSteps, current + 1),
+                                );
+                              }
+                            }}
+                            className="text-primary hover:underline font-medium">
+                            تخطي هذا السؤال
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )}
 
