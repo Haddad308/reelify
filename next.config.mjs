@@ -1,7 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Disable SWC minification to avoid binary issues
-  swcMinify: false,
   // Use Babel instead of SWC if SWC fails
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
