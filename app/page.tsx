@@ -59,8 +59,11 @@ export default function HomePage() {
   const [platform, setPlatform] = useState("instagram");
   const [preferredDuration, setPreferredDuration] = useState(45);
   const [audience, setAudience] = useState("شباب 18-30");
+  const [audienceSkipped, setAudienceSkipped] = useState(false);
   const [tone, setTone] = useState("ملهم");
+  const [toneSkipped, setToneSkipped] = useState(false);
   const [hookStyle, setHookStyle] = useState("سؤال مباشر");
+  const [hookStyleSkipped, setHookStyleSkipped] = useState(false);
   const [keyTopics, setKeyTopics] = useState<string[]>([]);
   const [callToAction, setCallToAction] = useState("شارك مع صديق");
   const [skipQuestions, setSkipQuestions] = useState(false);
@@ -87,14 +90,7 @@ export default function HomePage() {
   const [backgroundResult, setBackgroundResult] = useState<{
     ffmpeg: Awaited<ReturnType<typeof getFfmpeg>>;
     inputName: string;
-    candidates: Array<{
-      title: string;
-      start: number;
-      end: number;
-      category: string;
-      tags: string[];
-    }>;
-    segments: TranscriptSegment[];
+    audioUrl: string;
   } | null>(null);
   const [backgroundError, setBackgroundError] = useState<string>("");
   const [backgroundProcessing, setBackgroundProcessing] = useState(false);
@@ -153,34 +149,11 @@ export default function HomePage() {
         access: "public",
         handleUploadUrl: "/api/upload",
       });
-
-      // Call /api/process for transcription and Gemini analysis
-      const response = await fetch("/api/process", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ audioUrl: audioUpload.url }),
-      });
-
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload?.error || "حدث خطأ أثناء التحليل.");
-      }
-
-      const candidates = Array.isArray(payload?.clips) ? payload.clips : [];
-      const segments: TranscriptSegment[] = Array.isArray(payload?.segments)
-        ? payload.segments
-        : [];
-
-      if (candidates.length === 0) {
-        throw new Error("لم يتم العثور على مقاطع مناسبة.");
-      }
-
-      // Store results
+      // Store results needed for later processing
       setBackgroundResult({
         ffmpeg,
         inputName,
-        candidates,
-        segments,
+        audioUrl: audioUpload.url,
       });
     } catch (err) {
       console.error("Background processing error:", err);
@@ -236,11 +209,51 @@ export default function HomePage() {
 
       // Check if background result is ready
       if (!backgroundResultRef.current) {
-        throw new Error("لم يتم تحليل الفيديو بعد. يرجى المحاولة مرة أخرى.");
+        throw new Error("لم يتم تجهيز الفيديو بعد. يرجى المحاولة مرة أخرى.");
       }
 
-      const { ffmpeg, inputName, candidates, segments } =
-        backgroundResultRef.current;
+      const { ffmpeg, inputName, audioUrl } = backgroundResultRef.current;
+
+      // Build session preferences based on answered vs skipped questions
+      const sessionPreferences: Record<string, unknown> = {};
+
+      // Always include platform and preferred duration as they are required
+      sessionPreferences.platform = platform;
+      sessionPreferences.preferredDuration = preferredDuration;
+
+      if (!audienceSkipped && audience.trim()) {
+        sessionPreferences.audience = audience.trim();
+      }
+
+      if (!toneSkipped && tone.trim()) {
+        sessionPreferences.tone = tone.trim();
+      }
+
+      if (!hookStyleSkipped && hookStyle.trim()) {
+        sessionPreferences.hookStyle = hookStyle.trim();
+      }
+
+      // Call /api/process for transcription and Gemini analysis with preferences
+      setStatus("نحلل المحتوى ونختار أفضل المقاطع...");
+      const response = await fetch("/api/process", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ audioUrl, preferences: sessionPreferences }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.error || "حدث خطأ أثناء التحليل.");
+      }
+
+      const candidates = Array.isArray(payload?.clips) ? payload.clips : [];
+      const segments: TranscriptSegment[] = Array.isArray(payload?.segments)
+        ? payload.segments
+        : [];
+
+      if (candidates.length === 0) {
+        throw new Error("لم يتم العثور على مقاطع مناسبة.");
+      }
 
       // Helper to extract transcript for a specific time range
       const getClipTranscript = (start: number, end: number): string => {
@@ -350,7 +363,7 @@ export default function HomePage() {
     setError("");
     setStatus("");
     // Persist a minimal preference set so the model can infer defaults
-    await persistPreferences({ platform });
+    await persistPreferences({ platform, preferredDuration });
     void onStartProcessing();
   };
 
@@ -584,9 +597,56 @@ export default function HomePage() {
               {!skipQuestions && (
                 <>
                   {/* Question Title */}
-                  <h2 className="text-2xl font-bold text-center text-foreground animate-fade-in">
-                    {questionTitles[step]}
-                  </h2>
+                  <div className="space-y-2">
+                    <h2 className="text-2xl font-bold text-center text-foreground animate-fade-in">
+                      {questionTitles[step]}
+                    </h2>
+                    {/* Question status badge (answered vs skipped) */}
+                    <div className="flex justify-center">
+                      {step === 3 && (
+                        <>
+                          {audienceSkipped && (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-600 border border-red-200">
+                              تم تخطي هذا السؤال
+                            </span>
+                          )}
+                          {!audienceSkipped && audience.trim() && (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              تم اختيار إجابة لهذا السؤال
+                            </span>
+                          )}
+                        </>
+                      )}
+                      {step === 4 && (
+                        <>
+                          {toneSkipped && (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-600 border border-red-200">
+                              تم تخطي هذا السؤال
+                            </span>
+                          )}
+                          {!toneSkipped && tone.trim() && (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              تم اختيار إجابة لهذا السؤال
+                            </span>
+                          )}
+                        </>
+                      )}
+                      {step === 5 && (
+                        <>
+                          {hookStyleSkipped && (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-600 border border-red-200">
+                              تم تخطي هذا السؤال
+                            </span>
+                          )}
+                          {!hookStyleSkipped && hookStyle.trim() && (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              تم اختيار إجابة لهذا السؤال
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
 
                   {error && (
                     <p className="text-sm text-destructive text-center animate-fade-in">
@@ -777,7 +837,7 @@ export default function HomePage() {
                   {/* Step 3: Audience */}
                   {step === 3 && (
                     <div className="grid gap-4 animate-fade-in">
-                      {[
+                        {[
                         { value: "شباب 18-30", icon: "👥" },
                         { value: "رواد أعمال", icon: "💼" },
                         { value: "مهتمون بالتطوير الذاتي", icon: "🚀" },
@@ -789,6 +849,7 @@ export default function HomePage() {
                           type="button"
                           onClick={() => {
                             setAudience(option.value);
+                              setAudienceSkipped(false);
                             void persistPreferences({ audience: option.value });
                           }}
                           className={`flex items-center gap-5 p-5 rounded-2xl border-2 transition-all duration-300 text-right hover:scale-[1.02] active:scale-[0.98] ${
@@ -817,6 +878,45 @@ export default function HomePage() {
                           )}
                         </button>
                       ))}
+                      <div className="mt-4 space-y-3">
+                        <label className="block text-sm font-medium text-foreground">
+                          أو اكتب جمهورك المستهدف
+                        </label>
+                        <input
+                          type="text"
+                          value={audience}
+                          onChange={event => {
+                            setAudience(event.target.value);
+                            setAudienceSkipped(false);
+                          }}
+                          onBlur={() => {
+                            const trimmed = audience.trim();
+                            if (trimmed) {
+                              void persistPreferences({ audience: trimmed });
+                            }
+                          }}
+                          placeholder="مثال: أصحاب المشاريع الصغيرة، صناع المحتوى..."
+                          className="w-full rounded-xl border border-border bg-background/80 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        />
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>
+                            {audienceSkipped
+                              ? "تم تخطي هذا السؤال في هذه الجلسة."
+                              : "يمكنك اختيار خيار جاهز أو كتابة جمهورك الخاص."}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAudience("");
+                              setAudienceSkipped(true);
+                              setStep(current => Math.min(totalSteps, current + 1));
+                            }}
+                            className="text-primary hover:underline font-medium"
+                          >
+                            تخطي هذا السؤال
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -835,6 +935,7 @@ export default function HomePage() {
                           type="button"
                           onClick={() => {
                             setTone(option.value);
+                              setToneSkipped(false);
                             void persistPreferences({ tone: option.value });
                           }}
                           className={`flex items-center gap-5 p-5 rounded-2xl border-2 transition-all duration-300 text-right hover:scale-[1.02] active:scale-[0.98] ${
@@ -863,6 +964,45 @@ export default function HomePage() {
                           )}
                         </button>
                       ))}
+                      <div className="mt-4 space-y-3">
+                        <label className="block text-sm font-medium text-foreground">
+                          أو اكتب النبرة التي تريدها
+                        </label>
+                        <input
+                          type="text"
+                          value={tone}
+                          onChange={event => {
+                            setTone(event.target.value);
+                            setToneSkipped(false);
+                          }}
+                          onBlur={() => {
+                            const trimmed = tone.trim();
+                            if (trimmed) {
+                              void persistPreferences({ tone: trimmed });
+                            }
+                          }}
+                          placeholder="مثال: ملهم وعفوي، رسمي، قصصي..."
+                          className="w-full rounded-xl border border-border bg-background/80 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        />
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>
+                            {toneSkipped
+                              ? "تم تخطي هذا السؤال في هذه الجلسة."
+                              : "يمكنك اختيار خيار جاهز أو كتابة النبرة التي تناسبك."}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTone("");
+                              setToneSkipped(true);
+                              setStep(current => Math.min(totalSteps, current + 1));
+                            }}
+                            className="text-primary hover:underline font-medium"
+                          >
+                            تخطي هذا السؤال
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -889,6 +1029,7 @@ export default function HomePage() {
                           type="button"
                           onClick={() => {
                             setHookStyle(option.value);
+                            setHookStyleSkipped(false);
                             void persistPreferences({
                               hookStyle: option.value,
                             });
@@ -919,6 +1060,50 @@ export default function HomePage() {
                           )}
                         </button>
                       ))}
+                      <div className="mt-4 space-y-3">
+                        <label className="block text-sm font-medium text-foreground">
+                          أو اكتب أسلوب الافتتاح الذي تفضله
+                        </label>
+                        <input
+                          type="text"
+                          value={hookStyle}
+                          onChange={event => {
+                            setHookStyle(event.target.value);
+                            setHookStyleSkipped(false);
+                          }}
+                          onBlur={() => {
+                            const trimmed = hookStyle.trim();
+                            if (trimmed) {
+                              void persistPreferences({ hookStyle: trimmed });
+                            }
+                          }}
+                          placeholder="مثال: قصة شخصية سريعة، سؤال صادم، مشكلة شائعة..."
+                          className="w-full rounded-xl border border-border bg-background/80 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        />
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>
+                            {hookStyleSkipped
+                              ? "تم تخطي هذا السؤال في هذه الجلسة."
+                              : "يمكنك اختيار خيار جاهز أو كتابة أسلوب الافتتاح الذي تريده."}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setHookStyle("");
+                              setHookStyleSkipped(true);
+                              // If this is the last question, skipping should immediately start processing
+                              if (step >= totalSteps) {
+                                void onStartProcessing();
+                              } else {
+                                setStep(current => Math.min(totalSteps, current + 1));
+                              }
+                            }}
+                            className="text-primary hover:underline font-medium"
+                          >
+                            تخطي هذا السؤال
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )}
 

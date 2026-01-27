@@ -175,7 +175,8 @@ function PreviewContent() {
 
   return (
     <div className="min-h-screen bg-gradient-warm py-10 px-4" dir="rtl">
-      <div className="max-w-4xl mx-auto space-y-8">
+      <div className="max-w-4xl mx-auto space-y-8 items-center justify-center">
+
         {/* Mode Toggle */}
         <div className="flex justify-center">
           <Card className="shadow-card border-0 bg-gradient-card animate-fade-in">
