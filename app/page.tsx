@@ -67,6 +67,22 @@ export default function HomePage() {
   const [thumbnailPortraitMap, setThumbnailPortraitMap] = useState<
     Record<string, boolean>
   >({});
+  const recommendedDurationMap: Record<string, number> = {
+    instagram: 45,
+    tiktok: 60,
+    youtube: 60,
+    snapchat: 30,
+    facebook: 45,
+    linkedin: 45,
+  };
+  const platformLabels: Record<string, string> = {
+    instagram: "إنستغرام ريلز",
+    tiktok: "تيك توك",
+    youtube: "يوتيوب شورتس",
+    snapchat: "سناب شات سبوتلايت",
+    facebook: "فيسبوك ريلز",
+    linkedin: "لينكدإن ريلز",
+  };
 
   const [backgroundResult, setBackgroundResult] = useState<{
     ffmpeg: Awaited<ReturnType<typeof getFfmpeg>>;
@@ -664,13 +680,32 @@ export default function HomePage() {
                           ),
                           color: "text-blue-600",
                         },
+                        {
+                          value: "linkedin",
+                          label: "لينكدإن ريلز",
+                          icon: (
+                            <svg
+                              className="w-8 h-8 text-[#0A66C2]"
+                              viewBox="0 0 24 24"
+                              fill="currentColor">
+                              <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.35V9h3.414v1.561h.049c.476-.9 1.637-1.85 3.369-1.85 3.602 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 1 1 0-4.124 2.062 2.062 0 0 1 0 4.124zM6.828 20.452H3.84V9h2.988v11.452zM22.225 0H1.771C.792 0 0 .771 0 1.72v20.512C0 23.23.792 24 1.771 24h20.451C23.2 24 24 23.23 24 22.232V1.72C24 .771 23.2 0 22.222 0h.003z" />
+                            </svg>
+                          ),
+                          color: "text-[#0A66C2]",
+                        },
                       ].map((option, index) => (
                         <button
                           key={option.value}
                           type="button"
                           onClick={() => {
                             setPlatform(option.value);
-                            void persistPreferences({ platform: option.value });
+                            const recommendedDuration =
+                              recommendedDurationMap[option.value] ?? preferredDuration;
+                            setPreferredDuration(recommendedDuration);
+                            void persistPreferences({
+                              platform: option.value,
+                              preferredDuration: recommendedDuration,
+                            });
                           }}
                           className={`flex items-center gap-5 p-5 rounded-2xl border-2 transition-all duration-300 text-right hover:scale-[1.02] active:scale-[0.98] ${
                             platform === option.value
@@ -705,31 +740,37 @@ export default function HomePage() {
 
                   {/* Step 2: Duration */}
                   {step === 2 && (
-                    <div className="grid grid-cols-3 gap-4 animate-fade-in">
-                      {[30, 45, 60, 75, 90].map((duration, index) => (
-                        <button
-                          key={duration}
-                          type="button"
-                          onClick={() => {
-                            setPreferredDuration(duration);
-                            void persistPreferences({
-                              preferredDuration: duration,
-                            });
-                          }}
-                          className={`p-6 rounded-2xl border-2 transition-all duration-300 hover:scale-[1.05] active:scale-[0.98] ${
-                            preferredDuration === duration
-                              ? "border-primary bg-primary/10 shadow-teal"
-                              : "border-transparent bg-muted/50 hover:bg-muted hover:border-primary/20"
-                          }`}
-                          style={{ animationDelay: `${index * 0.1}s` }}>
-                          <span className="text-3xl font-bold text-foreground block">
-                            {duration}
-                          </span>
-                          <span className="block text-sm text-muted-foreground mt-1">
-                            ثانية
-                          </span>
-                        </button>
-                      ))}
+                    <div className="space-y-4 animate-fade-in">
+                      <p className="text-sm text-muted-foreground text-center">
+                        نوصي بمدة {recommendedDurationMap[platform] ?? preferredDuration} ثانية لمنصة{" "}
+                        {platformLabels[platform] ?? "المنصة"}.
+                      </p>
+                      <div className="grid grid-cols-3 gap-4">
+                        {[30, 45, 60, 75, 90].map((duration, index) => (
+                          <button
+                            key={duration}
+                            type="button"
+                            onClick={() => {
+                              setPreferredDuration(duration);
+                              void persistPreferences({
+                                preferredDuration: duration,
+                              });
+                            }}
+                            className={`p-6 rounded-2xl border-2 transition-all duration-300 hover:scale-[1.05] active:scale-[0.98] ${
+                              preferredDuration === duration
+                                ? "border-primary bg-primary/10 shadow-teal"
+                                : "border-transparent bg-muted/50 hover:bg-muted hover:border-primary/20"
+                            }`}
+                            style={{ animationDelay: `${index * 0.1}s` }}>
+                            <span className="text-3xl font-bold text-foreground block">
+                              {duration}
+                            </span>
+                            <span className="block text-sm text-muted-foreground mt-1">
+                              ثانية
+                            </span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
 

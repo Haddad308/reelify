@@ -1,9 +1,9 @@
 {
   "keyTopics": "القيادة والعمل الجماعي",
   "callToAction": "تابعنا للمزيد",
-  "hookStyle": "قصة قصيرة",
-  "platform": "youtube",
-  "preferredDuration": 30,
+  "hookStyle": "تنبيه أو تحذير",
+  "platform": "linkedin",
+  "preferredDuration": 45,
   "audience": "مهنيون في التقنية",
-  "tone": "تعليمي"
+  "tone": "عملي"
 }
