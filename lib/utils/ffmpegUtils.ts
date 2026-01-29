@@ -1,6 +1,70 @@
 import { Caption, ExportSettings } from '@/types';
 
 /**
+ * Convert CSS color (hex or rgba) to FFmpeg color format
+ * FFmpeg uses format: 0xRRGGBB or 0xRRGGBB@alpha
+ */
+function convertColorToFFmpeg(color: string): string {
+  if (!color || color === 'transparent') {
+    return '';
+  }
+
+  // Handle hex format (#RRGGBB or #RGB)
+  if (color.startsWith('#')) {
+    let hex = color.slice(1);
+    // Expand shorthand hex (#RGB -> #RRGGBB)
+    if (hex.length === 3) {
+      hex = hex.split('').map(c => c + c).join('');
+    }
+    return `0x${hex.toUpperCase()}`;
+  }
+
+  // Handle rgba format: rgba(r, g, b, a)
+  const rgbaMatch = color.match(/rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+))?\s*\)/i);
+  if (rgbaMatch) {
+    const r = parseInt(rgbaMatch[1], 10).toString(16).padStart(2, '0');
+    const g = parseInt(rgbaMatch[2], 10).toString(16).padStart(2, '0');
+    const b = parseInt(rgbaMatch[3], 10).toString(16).padStart(2, '0');
+    const alpha = rgbaMatch[4] !== undefined ? parseFloat(rgbaMatch[4]) : 1;
+    
+    const hexColor = `0x${r}${g}${b}`.toUpperCase();
+    
+    if (alpha < 1) {
+      return `${hexColor}@${alpha}`;
+    }
+    return hexColor;
+  }
+
+  // Handle rgb format: rgb(r, g, b)
+  const rgbMatch = color.match(/rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
+  if (rgbMatch) {
+    const r = parseInt(rgbMatch[1], 10).toString(16).padStart(2, '0');
+    const g = parseInt(rgbMatch[2], 10).toString(16).padStart(2, '0');
+    const b = parseInt(rgbMatch[3], 10).toString(16).padStart(2, '0');
+    return `0x${r}${g}${b}`.toUpperCase();
+  }
+
+  // Return as-is for named colors (FFmpeg supports some like 'white', 'black')
+  return color;
+}
+
+/**
+ * Escape text for FFmpeg drawtext filter
+ * FFmpeg requires escaping special characters in text
+ * 
+ * Note: Text inside single quotes only needs ' and \ escaped.
+ * Colons inside quoted text don't need escaping.
+ */
+function escapeTextForFFmpeg(text: string): string {
+  // FFmpeg drawtext filter escaping rules for text inside single quotes:
+  // - Backslashes need to be escaped as \\
+  // - Single quotes need special handling
+  return text
+    .replace(/\\/g, '\\\\')     // Escape backslashes first
+    .replace(/'/g, "'\\''");    // Escape single quotes (end quote, escaped quote, start quote)
+}
+
+/**
  * Apply text transformation
  */
 function applyTextTransform(
@@ -63,59 +127,63 @@ function buildSimpleCaptionFilter(
   // Apply text transform
   let text = applyTextTransform(caption.text, caption.style.textTransform);
 
-  // Escape text for FFmpeg
-  const escapedText = text.replace(/'/g, "\\'").replace(/:/g, "\\:");
+  // Escape text for FFmpeg using proper escaping
+  const escapedText = escapeTextForFFmpeg(text);
 
   // Calculate position (FFmpeg uses top-left origin)
   const x = caption.position.x;
   const y = caption.position.y;
 
+  // Convert colors to FFmpeg format
+  const fontColor = convertColorToFFmpeg(caption.style.color);
+
   // Build filter options
   const options: string[] = [
     `text='${escapedText}'`,
     `fontsize=${caption.style.fontSize}`,
-    `fontcolor=${caption.style.color.replace('#', '0x')}`,
+    `fontcolor=${fontColor}`,
     `x=${x}`,
     `y=${y}`,
     `enable='between(t,${captionStart},${captionEnd})'`,
   ];
 
-  // Font weight
-  if (caption.style.fontWeight && caption.style.fontWeight !== 'normal') {
-    options.push(`fontweight=${caption.style.fontWeight}`);
-  }
+  // Font weight - FFmpeg doesn't support fontweight directly in most builds
+  // Would need a bold font file to be specified instead
 
   if (caption.style.textAlign) {
     options.push(`text_align=${caption.style.textAlign}`);
   }
 
   if (caption.style.backgroundColor && caption.style.backgroundColor !== 'transparent') {
-    options.push(`box=1`);
-    const bgColor = caption.style.backgroundColor.replace('#', '0x');
-    options.push(`boxcolor=${bgColor}`);
+    const bgColor = convertColorToFFmpeg(caption.style.backgroundColor);
+    if (bgColor) {
+      options.push(`box=1`);
+      options.push(`boxcolor=${bgColor}`);
+      // Add some padding around the text box
+      options.push(`boxborderw=5`);
+    }
   }
 
   if (caption.style.strokeColor && caption.style.strokeWidth) {
+    const borderColor = convertColorToFFmpeg(caption.style.strokeColor);
     options.push(`borderw=${caption.style.strokeWidth}`);
-    options.push(`bordercolor=${caption.style.strokeColor.replace('#', '0x')}`);
+    options.push(`bordercolor=${borderColor}`);
   }
 
   // Shadow support
   if (caption.style.shadow && (caption.style.shadow.blur > 0 || caption.style.shadow.offsetX !== 0 || caption.style.shadow.offsetY !== 0)) {
-    options.push(`shadowcolor=${caption.style.shadow.color.replace('#', '0x')}`);
+    const shadowColor = convertColorToFFmpeg(caption.style.shadow.color);
+    options.push(`shadowcolor=${shadowColor}`);
     options.push(`shadowx=${caption.style.shadow.offsetX}`);
     options.push(`shadowy=${caption.style.shadow.offsetY}`);
   }
 
-  // Opacity (alpha channel)
+  // Opacity (alpha channel) - handled via fontcolor with alpha
   if (caption.style.opacity !== undefined && caption.style.opacity < 1) {
-    const alpha = Math.round(caption.style.opacity * 255).toString(16).padStart(2, '0');
-    // Append alpha to fontcolor
-    const colorWithAlpha = caption.style.color.replace('#', '0x') + alpha;
-    // Replace the fontcolor option
+    // If fontcolor doesn't already have alpha, add it
     const colorIndex = options.findIndex(opt => opt.startsWith('fontcolor='));
-    if (colorIndex !== -1) {
-      options[colorIndex] = `fontcolor=${colorWithAlpha}`;
+    if (colorIndex !== -1 && !options[colorIndex].includes('@')) {
+      options[colorIndex] = `fontcolor=${fontColor}@${caption.style.opacity}`;
     }
   }
 
