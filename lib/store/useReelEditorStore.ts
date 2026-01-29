@@ -77,8 +77,13 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
     });
     
     // Initialize captions from transcription (if available)
+    // Use overlap with initial trim so expanding the reel can add new segments
     if (clip.transcription && clip.transcription.segments.length > 0) {
-      const captions: Caption[] = clip.transcription.segments.map((segment, index) => ({
+      const overlappingSegments = clip.transcription.segments.filter(
+        (segment) =>
+          segment.start < clip.endTime && segment.end > clip.startTime
+      );
+      const captions: Caption[] = overlappingSegments.map((segment, index) => ({
         id: `caption-${index}`,
         text: segment.text,
         startTime: segment.start,
@@ -96,13 +101,7 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
         language: segment.language,
       }));
 
-      // Filter captions based on initial trim points
-      const filteredCaptions = filterVisibleCaptions(captions, {
-        startTime: clip.startTime,
-        endTime: clip.endTime,
-      });
-
-      set({ captions: filteredCaptions });
+      set({ captions });
     } else {
       // No transcription, start with empty captions
       set({ captions: [] });
@@ -158,11 +157,11 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
     const { captions, currentClip } = get();
     
     // If we have original transcription, regenerate captions from it
+    // Use overlap so expanding the reel includes new segments
     if (currentClip?.transcription && currentClip.transcription.segments.length > 0) {
       const newCaptions: Caption[] = currentClip.transcription.segments
-        .filter(segment => 
-          segment.start >= trimPoints.startTime && 
-          segment.end <= trimPoints.endTime
+        .filter(segment =>
+          segment.start < trimPoints.endTime && segment.end > trimPoints.startTime
         )
         .map((segment, index) => ({
           id: `caption-${index}`,

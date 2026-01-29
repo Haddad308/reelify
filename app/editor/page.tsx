@@ -197,25 +197,63 @@ function EditorContent() {
       ? Number.parseFloat(endTimeParam)
       : Math.max(videoDuration, 60);
 
-    // Parse transcript into segments if available
-    const segments = transcript
-      ? transcript
-          .split(/[.!?،؛]+/)
-          .filter((s) => s.trim().length > 0)
-          .map((text, index, arr) => {
-            // Distribute transcript segments across the clip duration
-            const clipDuration = endTime - startTime;
-            const segmentDuration = clipDuration / Math.max(arr.length, 1);
-            return {
-              text: text.trim(),
-              start: startTime + index * segmentDuration,
-              end: startTime + (index + 1) * segmentDuration,
-              language: /[\u0600-\u06FF]/.test(text)
-                ? ("ar" as const)
-                : ("en" as const),
-            };
-          })
-      : [];
+    // Prefer full-video segments from sessionStorage (allows expanding reel to show new text)
+    let segments: Array<{ text: string; start: number; end: number; language: "ar" | "en" }> = [];
+    if (typeof window !== "undefined") {
+      try {
+        const raw = window.sessionStorage.getItem("reelify_segments");
+        if (raw) {
+          const data = JSON.parse(raw) as unknown;
+          if (
+            Array.isArray(data) &&
+            data.length > 0 &&
+            data.every(
+              (s: unknown) =>
+                typeof s === "object" &&
+                s !== null &&
+                "start" in s &&
+                "end" in s &&
+                "text" in s
+            )
+          ) {
+            segments = (data as Array<{ start: number; end: number; text: string; language?: "ar" | "en" }>).map(
+              (seg) => ({
+                text: String(seg.text).trim(),
+                start: Number(seg.start),
+                end: Number(seg.end),
+                language:
+                  seg.language === "ar" || seg.language === "en"
+                    ? seg.language
+                    : /[\u0600-\u06FF]/.test(String(seg.text))
+                      ? ("ar" as const)
+                      : ("en" as const),
+              })
+            );
+          }
+        }
+      } catch {
+        // Ignore invalid sessionStorage data
+      }
+    }
+
+    // Fallback: parse transcript string and distribute across initial clip duration
+    if (segments.length === 0 && transcript) {
+      segments = transcript
+        .split(/[.!?،؛]+/)
+        .filter((s) => s.trim().length > 0)
+        .map((text, index, arr) => {
+          const clipDuration = endTime - startTime;
+          const segmentDuration = clipDuration / Math.max(arr.length, 1);
+          return {
+            text: text.trim(),
+            start: startTime + index * segmentDuration,
+            end: startTime + (index + 1) * segmentDuration,
+            language: /[\u0600-\u06FF]/.test(text)
+              ? ("ar" as const)
+              : ("en" as const),
+          };
+        });
+    }
 
     return {
       clipId: `clip-${Date.now()}`,

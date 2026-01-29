@@ -26,9 +26,9 @@ export function TranscriptionEditor() {
       
       setTranscriptionText(fullText);
     } else if (currentClip?.transcription) {
-      // Filter original transcription segments within trim range
+      // Filter by overlap so expanding the reel includes new segments
       const visibleSegments = currentClip.transcription.segments
-        .filter(seg => seg.start >= trimPoints.startTime && seg.end <= trimPoints.endTime)
+        .filter(seg => seg.start < trimPoints.endTime && seg.end > trimPoints.startTime)
         .sort((a, b) => a.start - b.start);
       
       const fullText = visibleSegments

@@ -472,12 +472,9 @@ function PreviewContent() {
                       <p className="text-xs font-semibold text-foreground/70">
                         المقطع المحدد (الريل)
                       </p>
-                      <div className="p-4 bg-amber-200/90 dark:bg-amber-400/40 rounded-2xl text-base text-foreground leading-relaxed border border-amber-300/50 dark:border-amber-500/30">
-                        {reelExcerptText}
-                      </div>
                     </div>
                   )}
-                  <div className="p-5 bg-muted/50 rounded-2xl text-base text-foreground/80 leading-relaxed max-h-40 overflow-y-auto border border-border/50">
+                  <div className="p-5 bg-muted/50 rounded-2xl text-base text-foreground/80 leading-relaxed max-h-[300px] overflow-y-auto border border-border/50">
                     {fullTranscriptSegments
                       ? fullTranscriptSegments.segments.map((seg, i) => {
                           const isReel =
