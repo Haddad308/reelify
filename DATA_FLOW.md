@@ -24,25 +24,24 @@ Reelify is an Arabic video reel generator that processes long-form videos and au
   2. Write video file to FFmpeg virtual filesystem
   3. Extract audio track using FFmpeg command:
      ```
-     -i input.mp4 -vn -acodec pcm_s16le -ar 16000 -ac 1 audio.wav
+     -i input.mp4 -vn -ac 1 -ar 16000 -acodec libmp3lame -b:a 24k audio.mp3
      ```
-  4. Convert audio to WAV format (16kHz, mono)
-- **Output**: Audio Blob (WAV format)
+  4. Convert audio to MP3 format (16kHz, mono, 24k bitrate) for smaller file size
+- **Output**: Audio Blob (MP3 format)
 
-**Step 1.3: Upload Audio to Cloud Storage**
+**Step 1.3: Store Audio in IndexedDB (Client-Side)**
 - **Location**: `app/page.tsx` - `startBackgroundProcessing()` function
-- **Endpoint**: `/api/upload` (POST)
-- **Tool**: Vercel Blob Storage (`@vercel/blob/client`)
+- **Tool**: IndexedDB (`lib/videoStorage.ts`)
 - **Process**:
   1. Create File object from audio Blob
-  2. Upload to Vercel Blob via `/api/upload` endpoint
-  3. Store returned URL for later processing
-- **Output**: `audioUrl` (Vercel Blob URL)
-- **API Details**:
-  - **Endpoint**: `POST /api/upload`
-  - **Handler**: `app/api/upload/route.ts`
-  - **Max Size**: 100MB
-  - **Allowed Types**: audio/wav, audio/mpeg, video/mp4, video/quicktime, image/jpeg
+  2. Store audio file in IndexedDB using `storeAudioFile()`
+  3. Create blob URL for local access (not uploaded to server)
+- **Output**: Audio file stored in IndexedDB, blob URL created locally
+- **Storage Details**:
+  - **Database**: `reelify-video-storage` (IndexedDB)
+  - **Store**: `audio` object store
+  - **Purpose**: Persist audio across page navigations, avoid server upload
+  - **Cleanup**: Cleared on page/tab close or new upload
 
 ---
 
@@ -95,46 +94,57 @@ Reelify is an Arabic video reel generator that processes long-form videos and au
 **Step 3.2: Call Processing API**
 - **Location**: `app/page.tsx` - `onStartProcessing()` function
 - **Endpoint**: `/api/process` (POST)
+- **Request Format**: FormData (multipart/form-data)
 - **Request Body**:
-  ```json
-  {
-    "audioUrl": "https://...blob.vercel-storage.com/...",
-    "preferences": {
-      "platform": "instagram",
-      "preferredDuration": 45,
-      "audience": "شباب 18-30",
-      "tone": "ملهم",
-      "hookStyle": "سؤال مباشر"
-    }
-  }
   ```
+  FormData:
+    - audio: File (MP3 audio file from IndexedDB)
+    - preferences: JSON string
+      {
+        "platform": "instagram",
+        "preferredDuration": 45,
+        "audience": "شباب 18-30",
+        "tone": "ملهم",
+        "hookStyle": "سؤال مباشر"
+      }
+  ```
+- **Process**:
+  1. Retrieve audio file from IndexedDB using `getAudioFile()`
+  2. Create FormData with audio file and preferences JSON
+  3. Send POST request to `/api/process`
 - **API Details**:
   - **Endpoint**: `POST /api/process`
   - **Handler**: `app/api/process/route.ts`
   - **Runtime**: Node.js
+  - **Content-Type**: `multipart/form-data`
 
-**Step 3.3: Download Audio from Blob Storage**
+**Step 3.3: Save Audio to Temporary File**
 - **Location**: `app/api/process/route.ts`
-- **Tool**: Node.js `fetch` API
+- **Tool**: Node.js File System (`node:fs/promises`)
 - **Process**:
-  1. Create temporary directory
-  2. Download audio file from Vercel Blob URL
-  3. Save to temporary file (`audio.wav`)
-- **Output**: Local audio file path
+  1. Parse FormData to extract audio File
+  2. Convert File to Buffer
+  3. Create temporary directory (`data/temp-audio/`)
+  4. Save audio Buffer to temporary file (`audio-{timestamp}-{random}.mp3`)
+  5. Pass file path to ElevenLabs API
+  6. Delete temporary file after transcription (in `finally` block)
+- **Output**: Temporary audio file path
+- **Cleanup**: File automatically deleted after processing
 
 **Step 3.4: Transcribe Audio**
 - **Location**: `app/api/process/route.ts` → `lib/elevenlabs.ts`
 - **Tool**: ElevenLabs Speech-to-Text API
 - **API Endpoint**: `https://api.elevenlabs.io/v1/speech-to-text`
 - **Process**:
-  1. Read audio file from disk
-  2. Create FormData with audio file
-  3. Send POST request to ElevenLabs API:
-     - Model: `scribe_v1`
+  1. Read audio file from temporary file path
+  2. Convert to Buffer using `readFile` from `node:fs/promises`
+  3. Create native FormData with audio Buffer as Blob
+  4. Send POST request to ElevenLabs API:
+     - Model: `scribe_v2` (configurable via `ELEVENLABS_STT_MODEL` env var)
      - Timestamps granularity: `word`
      - API Key: `ELEVENLABS_API_KEY` (from env)
-  4. Parse response to extract word-level timestamps
-  5. Group words into segments (max 12 words per segment)
+  5. Parse response to extract word-level timestamps
+  6. Return all segments (no filtering)
 - **Output**: `TranscriptSegment[]` array:
   ```typescript
   {
@@ -148,45 +158,58 @@ Reelify is an Arabic video reel generator that processes long-form videos and au
 - **Location**: `app/api/process/route.ts`
 - **Tool**: File System (`lib/qaStore.ts`)
 - **Process**:
-  1. Check if preferences provided in request
-  2. If not, load from `data/user-preferences.json`
-  3. Merge request preferences with stored preferences
-- **Output**: `QAPreferences` object
+  1. Parse preferences from FormData (JSON string)
+  2. Load stored preferences from `data/user-preferences.json` in parallel with transcription
+  3. Priority: Request preferences override stored preferences (no merging)
+  4. If request preferences exist and not empty → use request preferences
+  5. Else if stored preferences exist and not empty → use stored preferences
+  6. Else → use undefined (no preferences)
+- **Output**: `QAPreferences` object or `undefined`
 
 **Step 3.6: Generate Clip Candidates with AI**
 - **Location**: `app/api/process/route.ts` → `lib/gemini.ts`
 - **Tool**: Google Gemini AI (`@google/generative-ai`)
-- **Model**: `gemini-2.5-pro` (configurable via `GEMINI_MODEL` env var)
+- **Model**: `gemini-3-flash-preview` (default, configurable via `GEMINI_MODEL` env var)
+- **Model Fallback**: If model invalid/unavailable, auto-corrects to available models:
+  - `gemini-3-flash-preview` (fastest, default)
+  - `gemini-3-pro-preview` (fallback)
+  - `gemini-1.5-pro` (fallback)
 - **Process**:
-  1. Format transcript with timestamps:
+  1. Format transcript with timestamps (all segments included, no filtering):
      ```
      [0.00 - 5.23] النص العربي...
      [5.23 - 10.45] المزيد من النص...
      ```
   2. Build prompt with:
      - Transcript with timestamps
-     - User preferences (platform, duration, audience, tone, hook style)
-     - Instructions for selecting best 3 clips (30-90 seconds)
-     - Requirements for titles, categories, and tags
-  3. Send prompt to Gemini API
+     - User preferences (platform, duration, audience, tone, hook style, keyTopics, callToAction)
+     - Auto-detect language/dialect from transcript
+     - Instructions for selecting clips with score >= 65%
+     - Return all clips meeting criteria (no 20-clip limit)
+     - Use same language/dialect for titles and tags
+  3. Send prompt to Gemini API:
+     - `maxOutputTokens: 16384`
+     - `temperature: 0.7`
   4. Parse JSON response (with error recovery)
-  5. Validate clip candidates:
-     - Duration between 30-90 seconds
+  5. Filter clips: Only clips with `score >= 65` are returned
+  6. Validate clip candidates:
      - Valid start/end times
      - Snap timestamps to nearest segment boundaries
-- **Output**: `ClipCandidate[]` array:
+- **Output**: `ClipCandidate[]` array (all clips with score >= 65%):
   ```typescript
   {
-    title: string,      // Arabic title
+    title: string,      // Arabic title (same language/dialect as transcript)
     start: number,      // seconds
     end: number,        // seconds
     category: string,   // e.g., "تعليمي", "ترفيهي"
-    tags: string[]      // Arabic tags
+    tags: string[],     // Arabic tags (same language/dialect)
+    score: number      // Quality score (0-100)
   }[]
   ```
 - **API Details**:
   - **API Key**: `GEMINI_API_KEY` (from env)
-  - **Model**: `GEMINI_MODEL` (default: `gemini-2.5-pro`)
+  - **Model**: `GEMINI_MODEL` (default: `gemini-3-flash-preview`)
+  - **Note**: Platform-specific recommendations are static (not generated by LLM)
 
 **Step 3.7: Return Results**
 - **Location**: `app/api/process/route.ts`
@@ -216,49 +239,38 @@ Reelify is an Arabic video reel generator that processes long-form videos and au
 
 ### Phase 4: Video Clip Generation
 
-**Step 4.1: Process Each Clip Candidate**
+**Step 4.1: Display Results Immediately**
 - **Location**: `app/page.tsx` - `onStartProcessing()` function
-- **Tool**: FFmpeg WASM (client-side)
-- **Process**: For each clip candidate:
-  1. Extract video segment using FFmpeg:
-     ```
-     -ss {start} -i input.mp4 -t {duration} -c copy clip.mp4
-     ```
-  2. Extract thumbnail from first frame:
-     ```
-     -ss {start} -i input.mp4 -frames:v 1 -vf "scale=720:-1" thumb.jpg
-     ```
-  3. Generate transcript text for clip time range
-  4. Upload clip to Vercel Blob Storage
-  5. Upload thumbnail to Vercel Blob Storage
-
-**Step 4.2: Upload Clips & Thumbnails**
-- **Location**: `app/page.tsx` - `onStartProcessing()` function
-- **Endpoint**: `/api/upload` (POST)
-- **Tool**: Vercel Blob Storage
 - **Process**:
-  1. Upload video clip file
-  2. Upload thumbnail image file
-  3. Store URLs in clip objects
-- **Output**: Complete `ClipItem[]` array:
-  ```typescript
-  {
-    title: string,
-    duration: number,
-    url: string,           // Video URL
-    start: number,
-    end: number,
-    thumbnail: string,     // Thumbnail URL
-    category: string,
-    tags: string[],
-    transcript: string     // Text transcript for this clip
-  }[]
-  ```
+  1. Create `ClipItem[]` array with metadata from candidates
+  2. Use original video blob URL (stored in IndexedDB) for all clips
+  3. Set thumbnail to empty string initially (generated in background)
+  4. Generate transcript text for each clip time range from segments
+  5. Display results screen immediately (non-blocking)
+
+**Step 4.2: Generate Thumbnails in Background**
+- **Location**: `app/page.tsx` - `generateThumbnailsInParallel()` function
+- **Tool**: FFmpeg WASM (client-side)
+- **Process**:
+  1. Verify input file exists in FFmpeg virtual filesystem
+  2. If missing, re-write input file from original video (fixes memory access issues after long API calls)
+  3. For each clip candidate, extract thumbnail in parallel:
+     ```
+     -ss {start} -i input.mp4 -frames:v 1 -q:v 5 -vf "scale=640:-1" thumb.jpg
+     ```
+  4. Store thumbnails as Blobs in IndexedDB
+  5. Create blob URLs for display
+  6. Update clips with thumbnail URLs as they're generated
+- **Storage**: IndexedDB (`lib/videoStorage.ts`)
+  - **Database**: `reelify-video-storage`
+  - **Store**: `thumbnails` object store
+  - **Key**: `thumb-{start}-{end}`
+- **Output**: Thumbnail blob URLs updated in clip objects
 
 **Step 4.3: Cleanup**
-- **Location**: `app/page.tsx` - `onStartProcessing()` function
+- **Location**: `app/page.tsx` - `generateThumbnailsInParallel()` function
 - **Process**:
-  1. Delete input video file from FFmpeg virtual filesystem
+  1. After all thumbnails generated, delete input video file from FFmpeg virtual filesystem
   2. Free memory
 
 ---
@@ -268,10 +280,18 @@ Reelify is an Arabic video reel generator that processes long-form videos and au
 **Step 5.1: Display Clips**
 - **Location**: `app/page.tsx` - Results screen
 - **UI Elements**:
-  - Thumbnail image (9:16 aspect ratio)
+  - Thumbnail image (9:16 aspect ratio) - skeleton loader while generating
   - Title, category, tags
   - Duration badge
   - "معاينة وتحميل" (Preview & Download) button
+- **Platform Recommendations**: Static recommendations displayed during loading screen
+  - Rotates every 4 seconds
+  - Platform-specific tips (3-5 sentences per platform)
+  - Not generated by LLM (static data)
+- **Progress Tracking**: 
+  - 0-20%: FFmpeg processing (load, write input, extract audio)
+  - 20-92%: API call (transcription + Gemini analysis)
+  - 92-100%: Final processing and results display
 
 **Step 5.2: Preview & Download**
 - **Location**: `app/preview/page.tsx`
@@ -300,18 +320,19 @@ Reelify is an Arabic video reel generator that processes long-form videos and au
 ### 3. `/api/process` (POST)
 - **Purpose**: Main processing pipeline (transcription + AI analysis)
 - **Handler**: `app/api/process/route.ts`
+- **Request Format**: FormData (multipart/form-data)
 - **Request Body**:
-  ```json
-  {
-    "audioUrl": "string",
-    "preferences": {
-      "platform": "string",
-      "preferredDuration": number,
-      "audience": "string",
-      "tone": "string",
-      "hookStyle": "string"
-    }
-  }
+  ```
+  FormData:
+    - audio: File (MP3 audio file)
+    - preferences: JSON string
+      {
+        "platform": "string",
+        "preferredDuration": number,
+        "audience": "string",
+        "tone": "string",
+        "hookStyle": "string"
+      }
   ```
 - **Response**:
   ```json
@@ -321,8 +342,9 @@ Reelify is an Arabic video reel generator that processes long-form videos and au
   }
   ```
 - **External APIs Used**:
-  - ElevenLabs Speech-to-Text API
-  - Google Gemini AI API
+  - ElevenLabs Speech-to-Text API (scribe_v2 model)
+  - Google Gemini AI API (gemini-3-flash-preview model)
+- **Temporary Files**: Audio saved to `data/temp-audio/` and deleted after processing
 
 ---
 
@@ -332,12 +354,19 @@ Reelify is an Arabic video reel generator that processes long-form videos and au
 1. **FFmpeg WASM** (`@ffmpeg/ffmpeg`)
    - Video processing (audio extraction, clipping, thumbnail generation)
    - Runs entirely in browser
+   - Audio format: MP3 (16kHz, mono, 24k bitrate)
 
-2. **Vercel Blob Client** (`@vercel/blob/client`)
-   - File uploads to cloud storage
+2. **IndexedDB** (`lib/videoStorage.ts`)
+   - Client-side persistent storage for video, audio, and thumbnails
+   - Database: `reelify-video-storage`
+   - Stores: Video files, audio files, thumbnail blobs
+   - Purpose: Persist data across page navigations, avoid server uploads
+   - Cleanup: Cleared on page/tab close or new upload
 
 3. **React** (`react`)
    - UI framework and state management
+   - Progress tracking (0-100%)
+   - Static platform recommendations display
 
 ### Server-Side
 1. **ElevenLabs API**
@@ -350,13 +379,10 @@ Reelify is an Arabic video reel generator that processes long-form videos and au
    - Clip candidate generation
    - Natural language understanding
 
-3. **Vercel Blob Storage**
-   - Cloud file storage
-   - Public URLs for media files
-
-4. **Node.js File System** (`fs/promises`)
-   - Temporary file management
-   - Preferences storage
+3. **Node.js File System** (`node:fs/promises`)
+   - Temporary file management (`data/temp-audio/`)
+   - Preferences storage (`data/user-preferences.json`)
+   - Temporary files automatically cleaned up after processing
 
 ---
 
@@ -372,8 +398,8 @@ Reelify is an Arabic video reel generator that processes long-form videos and au
 │              BACKGROUND PROCESSING (Parallel)                   │
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │ 1. FFmpeg WASM extracts audio from video                │  │
-│  │ 2. Convert to WAV (16kHz, mono)                         │  │
-│  │ 3. Upload audio to Vercel Blob → /api/upload            │  │
+│  │ 2. Convert to MP3 (16kHz, mono, 24k bitrate)          │  │
+│  │ 3. Store audio in IndexedDB (client-side)             │  │
 │  └──────────────────────────────────────────────────────────┘  │
 └────────────────────────────┬────────────────────────────────────┘
                              │
@@ -400,16 +426,17 @@ Reelify is an Arabic video reel generator that processes long-form videos and au
 ┌─────────────────────────────────────────────────────────────────┐
 │                    POST /api/process                            │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │ Request: { audioUrl, preferences }                      │  │
+│  │ Request: FormData { audio: File, preferences: JSON }    │  │
 │  └────────────────────────────┬──────────────────────────────┘  │
 └──────────────────────────────┼──────────────────────────────────┘
                                │
                                ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│              DOWNLOAD AUDIO FROM VERCEL BLOB                    │
+│              SAVE AUDIO TO TEMPORARY FILE                       │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │ • Fetch audioUrl                                         │  │
-│  │ • Save to temp file (audio.wav)                          │  │
+│  │ • Parse FormData to extract audio File                  │  │
+│  │ • Convert to Buffer                                      │  │
+│  │ • Save to temp file (data/temp-audio/audio-*.mp3)      │  │
 │  └────────────────────────────┬──────────────────────────────┘  │
 └──────────────────────────────┼──────────────────────────────────┘
                                │
@@ -418,10 +445,11 @@ Reelify is an Arabic video reel generator that processes long-form videos and au
 │              TRANSCRIBE AUDIO (ElevenLabs API)                   │
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │ • POST to api.elevenlabs.io/v1/speech-to-text           │  │
-│  │ • Model: scribe_v1                                      │  │
+│  │ • Model: scribe_v2                                      │  │
 │  │ • Returns: word-level timestamps                        │  │
-│  │ • Group into segments (max 12 words)                    │  │
+│  │ • Return all segments (no filtering)                   │  │
 │  │ • Output: TranscriptSegment[]                           │  │
+│  │ • Delete temp file after transcription                 │  │
 │  └────────────────────────────┬──────────────────────────────┘  │
 └──────────────────────────────┼──────────────────────────────────┘
                                │
@@ -438,13 +466,15 @@ Reelify is an Arabic video reel generator that processes long-form videos and au
 ┌─────────────────────────────────────────────────────────────────┐
 │              GENERATE CLIP CANDIDATES (Gemini AI)                │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │ • Format transcript with timestamps                      │  │
+│  │ • Format transcript with timestamps (all segments)      │  │
 │  │ • Build prompt with preferences                          │  │
-│  │ • POST to Gemini API (gemini-2.5-pro)                   │  │
+│  │ • Auto-detect language/dialect                          │  │
+│  │ • POST to Gemini API (gemini-3-flash-preview)          │  │
 │  │ • Parse JSON response                                    │  │
-│  │ • Validate clips (30-90 seconds)                        │  │
+│  │ • Filter clips: score >= 65%                            │  │
+│  │ • Return all qualifying clips (no limit)                │  │
 │  │ • Snap timestamps to segment boundaries                  │  │
-│  │ • Output: ClipCandidate[] (3 clips)                      │  │
+│  │ • Output: ClipCandidate[] (all clips with score >= 65) │  │
 │  └────────────────────────────┬──────────────────────────────┘  │
 └──────────────────────────────┼──────────────────────────────────┘
                                │
@@ -458,15 +488,17 @@ Reelify is an Arabic video reel generator that processes long-form videos and au
                                │
                                ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│              CLIENT-SIDE VIDEO PROCESSING                        │
+│              CLIENT-SIDE PROCESSING                              │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │ For each clip candidate:                                 │  │
-│  │ 1. Extract video segment (FFmpeg WASM)                  │  │
-│  │ 2. Extract thumbnail (FFmpeg WASM)                      │  │
-│  │ 3. Generate transcript text for clip                     │  │
-│  │ 4. Upload clip → /api/upload                             │  │
-│  │ 5. Upload thumbnail → /api/upload                       │  │
-│  │ 6. Store URLs in ClipItem[]                             │  │
+│  │ 1. Display results immediately (no waiting)             │  │
+│  │ 2. Generate thumbnails in background (parallel)         │  │
+│  │    • Verify input file in FFmpeg filesystem             │  │
+│  │    • Re-write if missing (fixes memory issues)         │  │
+│  │    • Extract thumbnails for all clips                   │  │
+│  │    • Store in IndexedDB                                 │  │
+│  │    • Update clips with thumbnail URLs                   │  │
+│  │ 3. Use original video URL from IndexedDB                │  │
+│  │ 4. Cleanup FFmpeg files after thumbnails                │  │
 │  └────────────────────────────┬──────────────────────────────┘  │
 └──────────────────────────────┼──────────────────────────────────┘
                                │
@@ -486,9 +518,9 @@ Reelify is an Arabic video reel generator that processes long-form videos and au
 ## Environment Variables
 
 - `ELEVENLABS_API_KEY`: API key for ElevenLabs Speech-to-Text
+- `ELEVENLABS_STT_MODEL`: ElevenLabs STT model (default: `scribe_v2`)
 - `GEMINI_API_KEY`: API key for Google Gemini AI
-- `GEMINI_MODEL`: Gemini model name (default: `gemini-2.5-pro`)
-- `BLOB_READ_WRITE_TOKEN`: Vercel Blob storage token
+- `GEMINI_MODEL`: Gemini model name (default: `gemini-3-flash-preview`)
 
 ---
 
@@ -501,6 +533,7 @@ Reelify is an Arabic video reel generator that processes long-form videos and au
 - **Transcription**: `lib/elevenlabs.ts` (ElevenLabs integration)
 - **AI Analysis**: `lib/gemini.ts` (Gemini AI integration)
 - **Video Processing**: `lib/ffmpegWasm.ts` (FFmpeg WASM wrapper)
+- **Client Storage**: `lib/videoStorage.ts` (IndexedDB for video, audio, thumbnails)
 - **Preferences Storage**: `lib/qaStore.ts` (file-based preferences)
 
 ---
@@ -508,7 +541,14 @@ Reelify is an Arabic video reel generator that processes long-form videos and au
 ## Performance Optimizations
 
 1. **Background Processing**: Audio extraction happens while user fills form
-2. **Stream Copy**: Video clipping uses `-c copy` (no re-encoding)
-3. **Temporary File Cleanup**: Audio files deleted after processing
-4. **Memory Management**: FFmpeg files deleted after use
-5. **Parallel Operations**: Multiple clips processed sequentially but uploads can be parallelized
+2. **Client-Side Storage**: Audio, video, and thumbnails stored in IndexedDB (no server uploads)
+3. **MP3 Compression**: Audio compressed to 24k bitrate (smaller file size)
+4. **Parallel Operations**: 
+   - Preferences loading parallel with transcription
+   - Thumbnail generation in parallel for all clips
+5. **Temporary File Cleanup**: Audio files deleted after processing
+6. **Memory Management**: FFmpeg files deleted after use
+7. **Progress Tracking**: Detailed progress updates (0-100%) for better UX
+8. **Fast Model Selection**: Uses `gemini-3-flash-preview` (fastest available model)
+9. **Static Recommendations**: Platform recommendations are static (no LLM overhead)
+10. **FFmpeg Memory Fix**: Verifies and re-writes input file before thumbnail generation

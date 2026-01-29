@@ -11,24 +11,16 @@
     ┌─────────────┐                ┌──────────────────────┐
     │ Upload Video│───────────────▶│  FFmpeg WASM         │
     │   (File)    │                │  • Extract Audio    │
-    └─────────────┘                │  • Convert to WAV   │
+    └─────────────┘                │  • Convert to MP3   │
+                                   │  (16kHz, mono, 24k) │
                                    └──────────┬───────────┘
                                               │
                                               ▼
                                    ┌──────────────────────┐
-                                   │  Vercel Blob Client  │
-                                   │  Upload Audio        │
-                                   └──────────┬───────────┘
-                                              │
-                                              ▼
-                                   ┌──────────────────────┐
-                                   │  POST /api/upload     │
-                                   └──────────┬───────────┘
-                                              │
-                                              ▼
-                                   ┌──────────────────────┐
-                                   │  Vercel Blob Storage │
-                                   │  audioUrl returned   │
+                                   │  IndexedDB Storage    │
+                                   │  • Store Video       │
+                                   │  • Store Audio        │
+                                   │  (Client-side only)  │
                                    └──────────────────────┘
 
 
@@ -56,29 +48,36 @@
     User Browser                    Server API
     ┌─────────────┐                ┌──────────────────────┐
     │ Click Start │───────────────▶│ POST /api/process    │
-    │ Processing  │                │ { audioUrl, prefs }  │
-    └─────────────┘                └──────────┬───────────┘
+    │ Processing  │                │ FormData:            │
+    └─────────────┘                │ • audio: File        │
+                                   │ • preferences: JSON  │
+                                   └──────────┬───────────┘
                                               │
                                               ▼
                                    ┌──────────────────────┐
-                                   │ Download Audio       │
-                                   │ from Vercel Blob     │
+                                   │ Save Audio to Temp   │
+                                   │ data/temp-audio/     │
+                                   │ (MP3 file)           │
                                    └──────────┬───────────┘
                                               │
                                               ▼
                                    ┌──────────────────────┐
                                    │ ElevenLabs API       │
                                    │ Speech-to-Text       │
-                                   │ • Model: scribe_v1   │
+                                   │ • Model: scribe_v2   │
                                    │ • Word timestamps    │
+                                   │ • Delete temp file   │
                                    └──────────┬───────────┘
                                               │
                                               ▼ TranscriptSegment[]
                                    ┌──────────────────────┐
                                    │ Google Gemini API    │
-                                   │ • Model: gemini-2.5  │
+                                   │ • Model: gemini-3-   │
+                                   │   flash-preview      │
                                    │ • Analyze transcript │
-                                   │ • Generate 3 clips   │
+                                   │ • Score >= 65%       │
+                                   │ • All qualifying     │
+                                   │   clips (no limit)   │
                                    └──────────┬───────────┘
                                               │
                                               ▼ ClipCandidate[]
@@ -92,18 +91,21 @@
 │                      PHASE 4: VIDEO CLIP GENERATION                           │
 └─────────────────────────────────────────────────────────────────────────────┘
 
-    Client-Side Processing          Cloud Storage
+    Client-Side Processing          IndexedDB Storage
     ┌──────────────────────┐        ┌──────────────────────┐
-    │ FFmpeg WASM          │        │                      │
-    │ • Clip video         │        │                      │
-    │ • Extract thumbnail  │        │                      │
+    │ Display Results      │        │                      │
+    │ Immediately          │        │                      │
     └──────────┬───────────┘        │                      │
                │                    │                      │
                ▼                    │                      │
     ┌──────────────────────┐        │                      │
-    │ Upload Clip          │────────▶│  Vercel Blob        │
-    │ Upload Thumbnail     │────────▶│  Storage            │
-    └──────────────────────┘        │                      │
+    │ Generate Thumbnails  │        │                      │
+    │ (Background)         │        │                      │
+    │ • Verify FFmpeg file │        │                      │
+    │ • Extract thumbs     │────────▶│  IndexedDB          │
+    │ • Store in IndexedDB │        │  • Thumbnails       │
+    │ • Update clips       │        │  • Video            │
+    └──────────────────────┘        │  • Audio            │
                                      │                      │
                                      └──────────────────────┘
 
@@ -132,15 +134,16 @@
 
 ### Step 2: Audio Extraction
 - **Tool**: FFmpeg WASM (`@ffmpeg/ffmpeg`)
-- **Command**: `-i input.mp4 -vn -acodec pcm_s16le -ar 16000 -ac 1 audio.wav`
+- **Command**: `-i input.mp4 -vn -ac 1 -ar 16000 -acodec libmp3lame -b:a 24k audio.mp3`
 - **Input**: Video file
-- **Output**: WAV audio blob
+- **Output**: MP3 audio blob (16kHz, mono, 24k bitrate)
 
-### Step 3: Audio Upload
-- **Tool**: Vercel Blob Client (`@vercel/blob/client`)
-- **Endpoint**: `POST /api/upload`
-- **Input**: Audio blob
-- **Output**: `audioUrl` (public URL)
+### Step 3: Audio Storage
+- **Tool**: IndexedDB (`lib/videoStorage.ts`)
+- **Database**: `reelify-video-storage`
+- **Store**: `audio` object store
+- **Input**: Audio File object
+- **Output**: Stored in IndexedDB (client-side only, no server upload)
 
 ### Step 4: Preferences Collection
 - **Tool**: React state management
@@ -151,44 +154,63 @@
 ### Step 5: Processing Request
 - **Tool**: Fetch API
 - **Endpoint**: `POST /api/process`
-- **Input**: `{ audioUrl, preferences }`
+- **Format**: FormData (multipart/form-data)
+- **Input**: `{ audio: File, preferences: JSON string }`
 - **Output**: `{ clips, segments }`
 
-### Step 6: Audio Download
-- **Tool**: Node.js `fetch` + File System
-- **Input**: Vercel Blob URL
-- **Output**: Temporary audio file (`audio.wav`)
+### Step 6: Audio Temporary Storage
+- **Tool**: Node.js File System (`node:fs/promises`)
+- **Input**: Audio File from FormData
+- **Process**: Convert to Buffer, save to `data/temp-audio/audio-*.mp3`
+- **Output**: Temporary audio file path
+- **Cleanup**: Deleted after transcription
 
 ### Step 7: Transcription
 - **Tool**: ElevenLabs Speech-to-Text API
 - **Endpoint**: `https://api.elevenlabs.io/v1/speech-to-text`
-- **Model**: `scribe_v1`
-- **Input**: Audio file
-- **Output**: `TranscriptSegment[]` with timestamps
+- **Model**: `scribe_v2` (configurable via `ELEVENLABS_STT_MODEL`)
+- **Input**: Temporary audio file
+- **Output**: `TranscriptSegment[]` with timestamps (all segments, no filtering)
+- **Cleanup**: Temporary file deleted after transcription
 
 ### Step 8: AI Analysis
 - **Tool**: Google Gemini AI (`@google/generative-ai`)
-- **Model**: `gemini-2.5-pro`
+- **Model**: `gemini-3-flash-preview` (default, with fallbacks)
 - **Input**: Transcript + Preferences
-- **Output**: `ClipCandidate[]` (3 clips with titles, timestamps, categories, tags)
+- **Process**: 
+  - Auto-detect language/dialect
+  - Filter clips with score >= 65%
+  - Return all qualifying clips (no limit)
+- **Output**: `ClipCandidate[]` (all clips with score >= 65, titles/tags in same language/dialect)
 
-### Step 9: Video Clipping
+### Step 9: Display Results
+- **Tool**: React state management
+- **Process**: 
+  - Create ClipItem[] with metadata immediately
+  - Use original video URL from IndexedDB
+  - Show skeleton loaders for thumbnails
+  - Display static platform recommendations during loading
+- **Input**: ClipCandidate[] from API
+- **Output**: Results screen displayed (non-blocking)
+
+### Step 10: Thumbnail Generation (Background)
 - **Tool**: FFmpeg WASM
-- **Command**: `-ss {start} -i input.mp4 -t {duration} -c copy clip.mp4`
+- **Process**:
+  1. Verify input file exists in FFmpeg filesystem
+  2. Re-write if missing (fixes memory access issues)
+  3. Extract thumbnails in parallel for all clips
+- **Command**: `-ss {start} -i input.mp4 -frames:v 1 -q:v 5 -vf "scale=640:-1" thumb.jpg`
 - **Input**: Original video + clip timestamps
-- **Output**: Video clip blob
+- **Output**: Thumbnail image blobs
 
-### Step 10: Thumbnail Extraction
-- **Tool**: FFmpeg WASM
-- **Command**: `-ss {start} -i input.mp4 -frames:v 1 -vf "scale=720:-1" thumb.jpg`
-- **Input**: Original video + timestamp
-- **Output**: Thumbnail image blob
-
-### Step 11: Upload Media
-- **Tool**: Vercel Blob Client
-- **Endpoint**: `POST /api/upload`
-- **Input**: Clip blob + Thumbnail blob
-- **Output**: Public URLs for clips and thumbnails
+### Step 11: Store Thumbnails
+- **Tool**: IndexedDB (`lib/videoStorage.ts`)
+- **Database**: `reelify-video-storage`
+- **Store**: `thumbnails` object store
+- **Key**: `thumb-{start}-{end}`
+- **Input**: Thumbnail blobs
+- **Output**: Stored in IndexedDB, blob URLs created for display
+- **Cleanup**: FFmpeg input file deleted after thumbnails generated
 
 ---
 
@@ -196,7 +218,6 @@
 
 | Endpoint | Method | Purpose | Tools Used |
 |----------|--------|---------|------------|
-| `/api/upload` | POST | Upload files to cloud storage | Vercel Blob Client |
 | `/api/preferences` | GET | Get user preferences | File System |
 | `/api/preferences` | POST | Save user preferences | File System |
 | `/api/process` | POST | Main processing pipeline | ElevenLabs API, Gemini API |
@@ -208,8 +229,9 @@
 | Service | Purpose | Endpoint | Authentication |
 |---------|---------|----------|----------------|
 | **ElevenLabs** | Speech-to-Text | `api.elevenlabs.io/v1/speech-to-text` | `xi-api-key` header |
+| **ElevenLabs Model** | STT Model | `scribe_v2` (default) | Configurable via `ELEVENLABS_STT_MODEL` |
 | **Google Gemini** | AI Analysis | `generativelanguage.googleapis.com` | API Key in request |
-| **Vercel Blob** | File Storage | `blob.vercel-storage.com` | Token-based |
+| **Gemini Model** | AI Model | `gemini-3-flash-preview` (default) | Configurable via `GEMINI_MODEL` |
 
 ---
 
@@ -218,19 +240,21 @@
 ```
 File (Browser)
     ↓
-Blob (Audio)
+Blob (Audio MP3)
     ↓
-Vercel Blob URL (audioUrl)
+IndexedDB Storage (Client-side)
     ↓
-File (Server temp)
+File (FormData → Server temp)
     ↓
 TranscriptSegment[] (with timestamps)
     ↓
-ClipCandidate[] (AI-generated)
+ClipCandidate[] (AI-generated, score >= 65%)
     ↓
-ClipItem[] (with video URLs)
+ClipItem[] (with original video URL from IndexedDB)
     ↓
-Display in UI
+Display in UI (thumbnails generated in background)
+    ↓
+IndexedDB Storage (Thumbnails)
 ```
 
 ---
@@ -238,7 +262,13 @@ Display in UI
 ## Key Decision Points
 
 1. **Background Processing**: Audio extraction happens while user fills form (parallel)
-2. **Preference Merging**: Request preferences override stored preferences
-3. **Clip Validation**: Only clips 30-90 seconds are accepted
-4. **Timestamp Snapping**: Clip boundaries snap to nearest transcript segment
-5. **Error Recovery**: JSON parsing has fallback mechanisms for Gemini responses
+2. **Client-Side Storage**: Audio, video, and thumbnails stored in IndexedDB (no server uploads)
+3. **Preference Priority**: Request preferences override stored preferences (no merging)
+4. **Clip Filtering**: Only clips with score >= 65% are returned (no duration limit)
+5. **Timestamp Snapping**: Clip boundaries snap to nearest transcript segment
+6. **Error Recovery**: JSON parsing has fallback mechanisms for Gemini responses
+7. **Model Selection**: Auto-corrects invalid Gemini model names to available alternatives
+8. **FFmpeg Memory Fix**: Verifies and re-writes input file before thumbnail generation
+9. **Static Recommendations**: Platform recommendations are static (not LLM-generated)
+10. **Progress Tracking**: Detailed progress updates (0-100%) for better UX
+11. **Parallel Operations**: Preferences loading parallel with transcription, thumbnails generated in parallel
