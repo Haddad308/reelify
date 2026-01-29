@@ -588,7 +588,7 @@ function PreviewContent() {
                   <Button
                     variant="ghost"
                     onClick={() => window.close()}
-                    className="w-full h-12 hover:bg-muted hover:scale-[1.02] active:scale-[0.98] transition-all duration-200">
+                    className="w-full h-12 text-primary hover:bg-primary/10 hover:text-primary hover:scale-[1.02] active:scale-[0.98] transition-all duration-200">
                     إغلاق
                   </Button>
                 </div>
@@ -662,7 +662,7 @@ function PreviewContent() {
                     <button
                       type="button"
                       onClick={handleSeekBack}
-                      className="p-2 rounded-lg hover:bg-muted transition-colors"
+                      className="p-2 rounded-lg text-primary hover:bg-primary/20 transition-colors"
                       title="10 ثانية للخلف"
                       aria-label="10 ثانية للخلف">
                       <svg
@@ -704,7 +704,7 @@ function PreviewContent() {
                     <button
                       type="button"
                       onClick={handleSeekForward}
-                      className="p-2 rounded-lg hover:bg-muted transition-colors"
+                      className="p-2 rounded-lg text-primary hover:bg-primary/20 transition-colors"
                       title="10 ثانية للأمام"
                       aria-label="10 ثانية للأمام">
                       <svg
@@ -723,7 +723,7 @@ function PreviewContent() {
                     <button
                       type="button"
                       onClick={handleReplay}
-                      className="p-2 rounded-lg hover:bg-muted transition-colors"
+                      className="p-2 rounded-lg text-primary hover:bg-primary/20 transition-colors"
                       title="إعادة التشغيل"
                       aria-label="إعادة التشغيل">
                       <svg
