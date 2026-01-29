@@ -13,7 +13,7 @@ const SCOPES = [
   'publish_video',
 ].join(',');
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     if (!FACEBOOK_APP_ID) {
       return NextResponse.json(
@@ -21,6 +21,9 @@ export async function GET() {
         { status: 500 }
       );
     }
+
+    // Get the return URL from query params
+    const returnUrl = request.nextUrl.searchParams.get('return_url');
 
     // Generate a random state for CSRF protection
     const state = crypto.randomUUID();
@@ -44,6 +47,19 @@ export async function GET() {
       maxAge: 60 * 10, // 10 minutes
       path: '/',
     });
+
+    // Store the return URL in a cookie so the callback can use it
+    // Note: The returnUrl from query params is already URL-decoded by Next.js
+    // We need to re-encode it for storage in the cookie
+    if (returnUrl) {
+      response.cookies.set('facebook_return_url', encodeURIComponent(returnUrl), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 10, // 10 minutes
+        path: '/',
+      });
+    }
 
     return response;
   } catch (error) {
@@ -94,6 +110,7 @@ export async function DELETE() {
   response.cookies.delete('facebook_page_access_token');
   response.cookies.delete('facebook_page_id');
   response.cookies.delete('facebook_oauth_state');
+  response.cookies.delete('facebook_return_url');
   
   return response;
 }

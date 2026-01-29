@@ -6,6 +6,43 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 const REDIRECT_URI = `${BASE_URL}/api/auth/facebook/callback`;
 
 export async function GET(request: NextRequest) {
+  // Helper to get the redirect URL with auth params
+  const getRedirectUrl = () => {
+    const storedReturnUrl = request.cookies.get('facebook_return_url')?.value;
+    
+    if (storedReturnUrl) {
+      try {
+        // Decode the stored return URL and append auth param
+        const returnUrl = new URL(decodeURIComponent(storedReturnUrl));
+        returnUrl.searchParams.set('auth_success', 'facebook');
+        returnUrl.searchParams.delete('auth_error');
+        return returnUrl.toString();
+      } catch (e) {
+        console.error('Failed to parse return URL:', e);
+      }
+    }
+    
+    // Fallback to /editor with auth param
+    return new URL('/editor?auth_success=facebook', request.url).toString();
+  };
+
+  const getErrorRedirectUrl = (error: string) => {
+    const storedReturnUrl = request.cookies.get('facebook_return_url')?.value;
+    
+    if (storedReturnUrl) {
+      try {
+        const returnUrl = new URL(decodeURIComponent(storedReturnUrl));
+        returnUrl.searchParams.set('auth_error', error);
+        returnUrl.searchParams.delete('auth_success');
+        return returnUrl.toString();
+      } catch (e) {
+        console.error('Failed to parse return URL:', e);
+      }
+    }
+    
+    return new URL(`/editor?auth_error=${encodeURIComponent(error)}`, request.url).toString();
+  };
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const code = searchParams.get('code');
@@ -16,24 +53,24 @@ export async function GET(request: NextRequest) {
     // Check for OAuth errors
     if (error) {
       console.error('Facebook OAuth error:', error, errorDescription);
-      return NextResponse.redirect(
-        new URL(`/editor?auth_error=${encodeURIComponent(errorDescription || error)}`, request.url)
-      );
+      const response = NextResponse.redirect(getErrorRedirectUrl(errorDescription || error));
+      response.cookies.delete('facebook_return_url');
+      return response;
     }
 
     // Verify state to prevent CSRF
     const storedState = request.cookies.get('facebook_oauth_state')?.value;
     if (!state || state !== storedState) {
       console.error('State mismatch:', { state, storedState });
-      return NextResponse.redirect(
-        new URL('/editor?auth_error=state_mismatch', request.url)
-      );
+      const response = NextResponse.redirect(getErrorRedirectUrl('state_mismatch'));
+      response.cookies.delete('facebook_return_url');
+      return response;
     }
 
     if (!code) {
-      return NextResponse.redirect(
-        new URL('/editor?auth_error=no_code', request.url)
-      );
+      const response = NextResponse.redirect(getErrorRedirectUrl('no_code'));
+      response.cookies.delete('facebook_return_url');
+      return response;
     }
 
     // Exchange code for access token
@@ -48,17 +85,17 @@ export async function GET(request: NextRequest) {
 
     if (tokenData.error) {
       console.error('Facebook token error:', tokenData.error);
-      return NextResponse.redirect(
-        new URL(`/editor?auth_error=${encodeURIComponent(tokenData.error.message)}`, request.url)
-      );
+      const response = NextResponse.redirect(getErrorRedirectUrl(tokenData.error.message));
+      response.cookies.delete('facebook_return_url');
+      return response;
     }
 
     const { access_token, expires_in } = tokenData;
 
     if (!access_token) {
-      return NextResponse.redirect(
-        new URL('/editor?auth_error=no_access_token', request.url)
-      );
+      const response = NextResponse.redirect(getErrorRedirectUrl('no_access_token'));
+      response.cookies.delete('facebook_return_url');
+      return response;
     }
 
     // Exchange for a long-lived token (60 days instead of 1-2 hours)
@@ -80,10 +117,8 @@ export async function GET(request: NextRequest) {
     );
     const pagesData = await pagesResponse.json();
 
-    // Create redirect response
-    const response = NextResponse.redirect(
-      new URL('/editor?auth_success=facebook', request.url)
-    );
+    // Create redirect response - use the stored return URL
+    const response = NextResponse.redirect(getRedirectUrl());
 
     // Store user access token in httpOnly cookie
     response.cookies.set('facebook_access_token', finalToken, {
@@ -116,15 +151,16 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Clear the state cookie
+    // Clear the state and return URL cookies
     response.cookies.delete('facebook_oauth_state');
+    response.cookies.delete('facebook_return_url');
 
     return response;
   } catch (error) {
     console.error('Facebook callback error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.redirect(
-      new URL(`/editor?auth_error=${encodeURIComponent(errorMessage)}`, request.url)
-    );
+    const response = NextResponse.redirect(getErrorRedirectUrl(errorMessage));
+    response.cookies.delete('facebook_return_url');
+    return response;
   }
 }

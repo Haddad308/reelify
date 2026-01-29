@@ -15,6 +15,9 @@ const SCOPES = [
 
 export async function GET(request: NextRequest) {
   try {
+    // Get the return URL from query params
+    const returnUrl = request.nextUrl.searchParams.get('return_url');
+    
     // Generate a random state for CSRF protection
     const state = crypto.randomUUID();
     
@@ -37,6 +40,22 @@ export async function GET(request: NextRequest) {
       maxAge: 60 * 10, // 10 minutes
       path: '/',
     });
+
+    // Store the return URL in a cookie so the callback can use it
+    // Note: The returnUrl from query params is already URL-decoded by Next.js
+    // We need to re-encode it for storage in the cookie
+    if (returnUrl) {
+      console.log('Setting youtube_return_url cookie:', returnUrl);
+      response.cookies.set('youtube_return_url', encodeURIComponent(returnUrl), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 10, // 10 minutes
+        path: '/',
+      });
+    } else {
+      console.log('No return_url provided in query params');
+    }
 
     return response;
   } catch (error) {
@@ -104,6 +123,7 @@ export async function DELETE() {
   response.cookies.delete('youtube_access_token');
   response.cookies.delete('youtube_refresh_token');
   response.cookies.delete('youtube_oauth_state');
+  response.cookies.delete('youtube_return_url');
   
   return response;
 }
