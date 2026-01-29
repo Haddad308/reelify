@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   getFfmpeg,
   writeInputFile,
@@ -1800,6 +1801,19 @@ export default function HomePage() {
             )}
           </section>
         )}
+
+        {/* Footer Links */}
+        <footer className="mt-12 pt-8 border-t border-border/30 animate-fade-in">
+          <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground">
+            <Link href="/privacy" className="hover:text-primary transition-colors">
+              سياسة الخصوصية
+            </Link>
+            <span>•</span>
+            <Link href="/terms" className="hover:text-primary transition-colors">
+              الشروط والأحكام
+            </Link>
+          </div>
+        </footer>
       </section>
     </main>
   );
