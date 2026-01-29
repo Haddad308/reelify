@@ -88,6 +88,32 @@ export function Timeline() {
 
   const trimDuration = safeTrimPoints.endTime - safeTrimPoints.startTime;
 
+  const STEP = 1;
+  const minDuration = 0.1;
+
+  const handleStartMinus = () => {
+    const newStart = Math.min(
+      safeTrimPoints.startTime + STEP,
+      safeTrimPoints.endTime - minDuration
+    );
+    updateTrimStart(newStart);
+  };
+  const handleStartPlus = () => {
+    const newStart = Math.max(0, safeTrimPoints.startTime - STEP);
+    updateTrimStart(newStart);
+  };
+  const handleEndMinus = () => {
+    const newEnd = Math.max(
+      safeTrimPoints.endTime - STEP,
+      safeTrimPoints.startTime + minDuration
+    );
+    updateTrimEnd(newEnd);
+  };
+  const handleEndPlus = () => {
+    const newEnd = Math.min(sourceVideoDuration, safeTrimPoints.endTime + STEP);
+    updateTrimEnd(newEnd);
+  };
+
   if (sourceVideoDuration === 0) {
     return <div className={styles.container}>Loading timeline...</div>;
   }
@@ -166,6 +192,60 @@ export function Timeline() {
           </Slider.Root>
 
 
+        </div>
+      </div>
+
+      {/* ±1s trim controls */}
+      <div className={styles.trimControls}>
+        <div className={styles.trimControlGroup}>
+          <span className={styles.trimControlLabel}>Start</span>
+          <div className={styles.trimControlButtons}>
+            <button
+              type="button"
+              onClick={handleStartPlus}
+              disabled={safeTrimPoints.startTime <= 0}
+              className={styles.trimBtn}
+              title="بداية المقطع قبل ثانية (+1s)"
+              aria-label="بداية المقطع قبل ثانية"
+            >
+              +1s
+            </button>
+            <button
+              type="button"
+              onClick={handleStartMinus}
+              disabled={safeTrimPoints.startTime >= safeTrimPoints.endTime - minDuration}
+              className={styles.trimBtn}
+              title="بداية المقطع بعد ثانية (−1s)"
+              aria-label="بداية المقطع بعد ثانية"
+            >
+              −1s
+            </button>
+          </div>
+        </div>
+        <div className={styles.trimControlGroup}>
+          <span className={styles.trimControlLabel}>End</span>
+          <div className={styles.trimControlButtons}>
+            <button
+              type="button"
+              onClick={handleEndMinus}
+              disabled={safeTrimPoints.endTime <= safeTrimPoints.startTime + minDuration}
+              className={styles.trimBtn}
+              title="نهاية المقطع قبل ثانية (−1s)"
+              aria-label="نهاية المقطع قبل ثانية"
+            >
+              −1s
+            </button>
+            <button
+              type="button"
+              onClick={handleEndPlus}
+              disabled={safeTrimPoints.endTime >= sourceVideoDuration}
+              className={styles.trimBtn}
+              title="نهاية المقطع بعد ثانية (+1s)"
+              aria-label="نهاية المقطع بعد ثانية"
+            >
+              +1s
+            </button>
+          </div>
         </div>
       </div>
 
