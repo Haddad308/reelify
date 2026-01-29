@@ -7,3 +7,4 @@ public/clips
 tmp
 *.log
 .next/
+data/temp-audio/

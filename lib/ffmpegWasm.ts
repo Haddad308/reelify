@@ -32,23 +32,26 @@ async function deleteFile(ffmpeg: FFmpeg, name: string) {
 }
 
 export async function extractAudioWav(ffmpeg: FFmpeg, inputName: string, outputName: string) {
+  // Use MP3 compression for smaller file size (24k bitrate, 16kHz mono)
   await ffmpeg.exec([
     "-i",
     inputName,
     "-vn",
-    "-acodec",
-    "pcm_s16le",
-    "-ar",
-    "16000",
     "-ac",
     "1",
+    "-ar",
+    "16000",
+    "-acodec",
+    "libmp3lame",
+    "-b:a",
+    "24k",
     outputName
   ]);
   const audioData = await ffmpeg.readFile(outputName);
   await deleteFile(ffmpeg, outputName); // Free memory
   const audioBytes = typeof audioData === "string" ? new TextEncoder().encode(audioData) : audioData;
   const audioBlobPart = audioBytes as BlobPart;
-  return new Blob([audioBlobPart], { type: "audio/wav" });
+  return new Blob([audioBlobPart], { type: "audio/mpeg" });
 }
 
 export async function clipVideoSegment(

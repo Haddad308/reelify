@@ -1,41 +1,27 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { upload } from "@vercel/blob/client";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import {
   getFfmpeg,
   writeInputFile,
   extractAudioWav,
-  clipVideoSegment,
-  extractThumbnail,
   cleanupInputFile,
+  extractThumbnail,
 } from "@/lib/ffmpegWasm";
+import { storeVideoFile, storeThumbnails, getThumbnailBlobUrl, storeAudioFile, getAudioFile, clearAllStorage } from "@/lib/videoStorage";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Progress } from "@/components/ui/progress";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import Image from "next/image";
 
 type ClipItem = {
   title: string;
   duration: number;
-  url: string;
+  url: string; // Original video URL (full video)
   start: number;
   end: number;
-  thumbnail: string;
+  thumbnail: string; // Optional - not generated until needed
   category: string;
   tags: string[];
   transcript: string;
@@ -48,9 +34,12 @@ type TranscriptSegment = {
 };
 
 export default function HomePage() {
+  const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
+  const [videoBlobUrl, setVideoBlobUrl] = useState<string | null>(null);
   const [clips, setClips] = useState<ClipItem[]>([]);
   const [status, setStatus] = useState<string>("");
+  const [progress, setProgress] = useState<number>(0);
   const [error, setError] = useState<string>("");
   const [screen, setScreen] = useState<
     "upload" | "form" | "loading" | "results"
@@ -65,12 +54,69 @@ export default function HomePage() {
   const [toneSkipped, setToneSkipped] = useState(false);
   const [hookStyle, setHookStyle] = useState("سؤال مباشر");
   const [hookStyleSkipped, setHookStyleSkipped] = useState(false);
-  const [keyTopics, setKeyTopics] = useState<string[]>([]);
-  const [callToAction, setCallToAction] = useState("شارك مع صديق");
   const [skipQuestions, setSkipQuestions] = useState(false);
-  const [thumbnailPortraitMap, setThumbnailPortraitMap] = useState<
-    Record<string, boolean>
-  >({});
+  
+  // Platform-specific recommendations (static)
+  const platformRecommendations = [
+    {
+      platform: "instagram",
+      sentences: [
+        "اجعل النص قصيرًا وجذّابًا مع إيموجي مناسبة 📸✨",
+        "القصص اليومية والتفاعل السريع يرفعان الوصول",
+        "استخدم وسمين إلى ثلاثة كحد أقصى لنتائج أفضل"
+      ]
+    },
+    {
+      platform: "facebook",
+      sentences: [
+        "المحتوى القصصي يحقق تفاعلًا أعلى على فيسبوك",
+        "المنشورات التي تطرح سؤالًا تشجع على التعليقات",
+        "الطول المتوسط للنص هو الأفضل هنا"
+      ]
+    },
+    {
+      platform: "tiktok",
+      sentences: [
+        "ابدأ بجملة قوية تجذب الانتباه خلال أول 3 ثوانٍ",
+        "النبرة العفوية أفضل من الرسمية",
+        "اتبع الترند لكن بأسلوبك الخاص"
+      ]
+    },
+    {
+      platform: "youtube",
+      sentences: [
+        "العنوان والوصف لا يقلان أهمية عن الفيديو نفسه",
+        "شجّع المشاهد على التفاعل في نهاية المحتوى",
+        "المحتوى التعليمي أو الترفيهي الطويل ينجح أكثر"
+      ]
+    },
+    {
+      platform: "snapchat",
+      sentences: [
+        "المحتوى السريع والجذاب يحقق أفضل النتائج",
+        "استخدم المؤثرات البصرية لجذب الانتباه",
+        "المحتوى اليومي والعفوي ينجح أكثر"
+      ]
+    },
+    {
+      platform: "linkedin",
+      sentences: [
+        "احرص على أسلوب مهني وواضح",
+        "شارك تجربة أو قيمة عملية للقارئ",
+        "المنشورات التعليمية تحقق أداءً قويًا"
+      ]
+    }
+  ];
+  
+  const [currentRecommendationIndex, setCurrentRecommendationIndex] = useState<number>(0);
+  
+  // Get recommendations for current platform (computed)
+  const currentRecommendations = useMemo(() => {
+    return platformRecommendations.find(
+      (rec) => rec.platform === platform
+    )?.sentences || platformRecommendations[0].sentences;
+  }, [platform]);
+  
   const recommendedDurationMap: Record<string, number> = {
     instagram: 45,
     tiktok: 60,
@@ -113,6 +159,196 @@ export default function HomePage() {
     backgroundProcessingRef.current = backgroundProcessing;
   }, [backgroundProcessing]);
 
+  // Rotate through recommendations every 4 seconds when on loading screen
+  useEffect(() => {
+    if (screen === "loading") {
+      const currentRecs = platformRecommendations.find(
+        (rec) => rec.platform === platform
+      )?.sentences || platformRecommendations[0].sentences;
+      
+      if (currentRecs.length > 1) {
+        const interval = setInterval(() => {
+          setCurrentRecommendationIndex((prev) => (prev + 1) % currentRecs.length);
+        }, 4000); // Change recommendation every 4 seconds
+        
+        return () => clearInterval(interval);
+      }
+    } else {
+      // Reset index when leaving loading screen
+      setCurrentRecommendationIndex(0);
+    }
+  }, [screen, platform]);
+
+  // Clear IndexedDB on page refresh or close
+  useEffect(() => {
+    if (typeof globalThis.window === "undefined") return;
+
+    // Check if this is a page refresh (not a navigation)
+    const navEntry = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+    const isRefresh = navEntry?.type === 'reload';
+
+    // Clear IndexedDB on refresh ONLY if there's no active session
+    // (i.e., no clips stored in sessionStorage - meaning user is starting fresh)
+    if (isRefresh) {
+      const hasActiveSession = globalThis.sessionStorage.getItem("reelify_clips") !== null;
+      if (hasActiveSession) {
+        console.log('[IndexedDB] Page refreshed but active session exists, preserving storage...');
+      } else {
+        console.log('[IndexedDB] Page refreshed with no active session, clearing storage...');
+        void clearAllStorage();
+      }
+    }
+
+    // Clear IndexedDB when page/tab is closing
+    const handleBeforeUnload = () => {
+      console.log('[IndexedDB] Page closing, clearing storage...');
+      void clearAllStorage();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
+
+  // Restore state from sessionStorage only when navigating back (not on initial load)
+  useEffect(() => {
+    if (typeof globalThis.window === "undefined") return;
+
+    // Check if this is a navigation back event (user came from editor)
+    const navigationState = globalThis.sessionStorage.getItem(
+      "reelify_navigation_back",
+    );
+
+    // Only restore if user explicitly navigated back AND we're on upload screen
+    if (navigationState === "true" && screen === "upload") {
+      const storedClips = globalThis.sessionStorage.getItem("reelify_clips");
+      const storedScreen = globalThis.sessionStorage.getItem("reelify_screen");
+      const storedVideoUrl =
+        globalThis.sessionStorage.getItem("reelify_video_url");
+
+      // If we have stored clips and video URL, restore the results screen
+      if (storedClips && storedVideoUrl && storedScreen === "results") {
+        try {
+          const parsedClips = JSON.parse(storedClips);
+          if (Array.isArray(parsedClips) && parsedClips.length > 0) {
+            // Restore thumbnails from IndexedDB
+            // Always restore from IndexedDB when navigating back since blob URLs are revoked
+            const restoreThumbnails = async () => {
+              const clipsWithThumbnails = await Promise.all(
+                parsedClips.map(async (clip: ClipItem) => {
+                  // Always try to restore thumbnail from IndexedDB when navigating back
+                  const clipKey = `thumb-${clip.start}-${clip.end}`;
+                  const thumbnailUrl = await getThumbnailBlobUrl(clipKey);
+                  if (thumbnailUrl) {
+                    return { ...clip, thumbnail: thumbnailUrl };
+                  }
+                  // If no thumbnail found in IndexedDB, return clip without thumbnail
+                  return { ...clip, thumbnail: "" };
+                })
+              );
+              setClips(clipsWithThumbnails);
+            };
+            
+            setVideoBlobUrl(storedVideoUrl); // Restore blob URL
+            setScreen("results");
+            void restoreThumbnails(); // Restore thumbnails asynchronously
+            // Clear the navigation flag
+            globalThis.sessionStorage.removeItem("reelify_navigation_back");
+          }
+        } catch (e) {
+          console.error("Failed to restore clips from sessionStorage:", e);
+          globalThis.sessionStorage.removeItem("reelify_navigation_back");
+        }
+      } else {
+        // Clear invalid state
+        globalThis.sessionStorage.removeItem("reelify_navigation_back");
+      }
+    }
+  }, [screen]);
+
+  // Cleanup blob URLs when component unmounts
+  useEffect(() => {
+    return () => {
+      if (videoBlobUrl) {
+        URL.revokeObjectURL(videoBlobUrl);
+      }
+    };
+  }, [videoBlobUrl]);
+
+  // Generate thumbnails in parallel for faster processing
+  const generateThumbnailsInParallel = async (
+    ffmpeg: Awaited<ReturnType<typeof getFfmpeg>>,
+    inputName: string,
+    clips: ClipItem[],
+    videoFile: File | null,
+  ): Promise<string[]> => {
+    const thumbnailData: { blob: Blob; clipKey: string }[] = [];
+    
+    // Verify input file exists in FFmpeg's virtual filesystem, re-write if needed
+    // This is necessary because after the long API call, the file might have been lost
+    try {
+      await ffmpeg.readFile(inputName);
+      console.log('[Thumbnails] Input file verified in FFmpeg filesystem');
+    } catch (error) {
+      console.warn('[Thumbnails] Input file not found in FFmpeg filesystem, re-writing...', error);
+      if (videoFile) {
+        try {
+          await writeInputFile(ffmpeg, inputName, videoFile);
+          console.log('[Thumbnails] Input file re-written successfully');
+        } catch (rewriteError) {
+          console.error('[Thumbnails] Failed to re-write input file:', rewriteError);
+          throw new Error('Failed to prepare video file for thumbnail generation');
+        }
+      } else {
+        throw new Error('Video file not available for thumbnail generation');
+      }
+    }
+    
+    const thumbnailPromises = clips.map(async (clip, index) => {
+      try {
+        const thumbName = `thumb-${crypto.randomUUID()}.jpg`;
+        const thumbBlob = await extractThumbnail(
+          ffmpeg,
+          inputName,
+          thumbName,
+          clip.start,
+        );
+
+        // Create clip key for storage (using start and end time as unique identifier)
+        const clipKey = `thumb-${clip.start}-${clip.end}`;
+        
+        // Create local blob URL instead of uploading to Vercel Blob
+        const blobUrl = URL.createObjectURL(thumbBlob);
+        
+        // Store thumbnail blob for persistence (will be stored in batch after all are generated)
+        thumbnailData.push({ blob: thumbBlob, clipKey });
+        
+        return blobUrl;
+      } catch (error) {
+        console.error(`Failed to generate thumbnail for clip ${index}:`, error);
+        return ""; // Return empty string on error
+      }
+    });
+
+    const blobUrls = await Promise.all(thumbnailPromises);
+    
+    // Store thumbnails in IndexedDB for persistence
+    if (thumbnailData.length > 0) {
+      try {
+        console.log('[Thumbnails] Storing', thumbnailData.length, 'thumbnails in IndexedDB');
+        await storeThumbnails(thumbnailData);
+        console.log('[Thumbnails] Successfully stored thumbnails in IndexedDB');
+      } catch (error) {
+        console.error('[Thumbnails] Failed to store thumbnails in IndexedDB:', error);
+        // Continue even if storage fails
+      }
+    }
+
+    return blobUrls;
+  };
+
   const persistPreferences = async (partial: Record<string, unknown>) => {
     try {
       await fetch("/api/preferences", {
@@ -131,30 +367,42 @@ export default function HomePage() {
     setBackgroundProcessing(true);
     setBackgroundError("");
     setBackgroundResult(null);
+    setProgress(0);
+    setStatus("جاري تحضير الفيديو...");
 
     try {
       // Load FFmpeg and write input file
+      setProgress(5);
+      setStatus("جاري تحميل أدوات المعالجة...");
       const ffmpeg = await getFfmpeg();
+      
+      setProgress(10);
+      setStatus("جاري قراءة ملف الفيديو...");
       const inputName = `input-${Date.now()}.mp4`;
       await writeInputFile(ffmpeg, inputName, videoFile);
 
-      // Extract audio
-      const audioName = `audio-${Date.now()}.wav`;
+      // Extract audio (now MP3 compressed for smaller file size)
+      setProgress(15);
+      setStatus("جاري استخراج الصوت من الفيديو...");
+      const audioName = `audio-${Date.now()}.mp3`;
       const audioBlob = await extractAudioWav(ffmpeg, inputName, audioName);
+      
+      setProgress(20);
 
-      // Upload audio to Vercel Blob
-      const audioFile = new File([audioBlob], "audio.wav", {
-        type: "audio/wav",
+      // Store audio in IndexedDB (client-side only, no server upload)
+      const audioFile = new File([audioBlob], "audio.mp3", {
+        type: "audio/mpeg",
       });
-      const audioUpload = await upload(audioFile.name, audioFile, {
-        access: "public",
-        handleUploadUrl: "/api/upload",
-      });
+      await storeAudioFile(audioFile);
+      
+      // Create blob URL for local access
+      const audioBlobUrl = URL.createObjectURL(audioFile);
+      
       // Store results needed for later processing
       setBackgroundResult({
         ffmpeg,
         inputName,
-        audioUrl: audioUpload.url,
+        audioUrl: audioBlobUrl, // Blob URL for local access
       });
     } catch (err) {
       console.error("Background processing error:", err);
@@ -166,10 +414,12 @@ export default function HomePage() {
     }
   };
 
-  const onUploadSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const onUploadSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
     setStatus("");
+    setProgress(0);
+    setCurrentRecommendationIndex(0);
     setClips([]);
     setBackgroundError("");
     setBackgroundResult(null);
@@ -177,6 +427,27 @@ export default function HomePage() {
     if (!file) {
       setError("يرجى اختيار فيديو قبل المتابعة.");
       return;
+    }
+
+    // Clear old IndexedDB data when starting a new upload
+    await clearAllStorage();
+
+    // Store video file in IndexedDB for persistence across page navigations
+    await storeVideoFile(file);
+
+    // Create blob URL from local file (no upload needed)
+    const blobUrl = URL.createObjectURL(file);
+    setVideoBlobUrl(blobUrl);
+
+    // Clear old sessionStorage when starting new upload
+    if (typeof globalThis.window !== "undefined") {
+      globalThis.sessionStorage.removeItem("reelify_clips");
+      globalThis.sessionStorage.removeItem("reelify_screen");
+      globalThis.sessionStorage.removeItem("reelify_video_url");
+      globalThis.sessionStorage.removeItem("reelify_video_name");
+      globalThis.sessionStorage.removeItem("reelify_navigation_back");
+      // Store blob URL in sessionStorage as backup
+      globalThis.sessionStorage.setItem("reelify_video_blob_url", blobUrl);
     }
 
     setStep(1);
@@ -198,7 +469,7 @@ export default function HomePage() {
         // Poll until background processing is done (max 120 seconds)
         let attempts = 0;
         while (backgroundProcessingRef.current && attempts < 1200) {
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await new Promise((resolve) => setTimeout(resolve, 100));
           attempts++;
         }
       }
@@ -213,7 +484,25 @@ export default function HomePage() {
         throw new Error("لم يتم تجهيز الفيديو بعد. يرجى المحاولة مرة أخرى.");
       }
 
-      const { ffmpeg, inputName, audioUrl } = backgroundResultRef.current;
+      const { ffmpeg, inputName } = backgroundResultRef.current;
+
+      // Use local blob URL instead of uploading to Vercel (much faster!)
+      if (!videoBlobUrl) {
+        throw new Error("رابط الفيديو غير موجود.");
+      }
+      const originalVideoUrl = videoBlobUrl;
+
+      // Store video blob URL in sessionStorage for persistence
+      if (typeof globalThis.window !== "undefined") {
+        globalThis.sessionStorage.setItem(
+          "reelify_video_url",
+          originalVideoUrl,
+        );
+        globalThis.sessionStorage.setItem(
+          "reelify_video_name",
+          file?.name || "video.mp4",
+        );
+      }
 
       // Build session preferences based on answered vs skipped questions
       const sessionPreferences: Record<string, unknown> = {};
@@ -235,12 +524,43 @@ export default function HomePage() {
       }
 
       // Call /api/process for transcription and Gemini analysis with preferences
+      // Send audio file directly as FormData instead of URL
+      setProgress(20);
       setStatus("نحلل المحتوى ونختار أفضل المقاطع...");
+      
+      // Get audio file from IndexedDB
+      const audioFile = await getAudioFile();
+      if (!audioFile) {
+        throw new Error("لم يتم العثور على ملف الصوت. يرجى المحاولة مرة أخرى.");
+      }
+      
+      setProgress(20);
+      
+      // Send audio as FormData
+      const formData = new FormData();
+      formData.append("audio", audioFile);
+      formData.append("preferences", JSON.stringify(sessionPreferences));
+      
+      // Simulate progress during API call - continue incrementing smoothly throughout
+      // The API call can take 60-80 seconds, so we need to increment slowly
+      let progressValue = 20;
+      const progressInterval = setInterval(() => {
+        // Increment slowly: 0.3% every 300ms = 1% per second
+        // This allows up to ~80 seconds of API processing time (20% -> 100%)
+        progressValue = Math.min(progressValue + 0.3, 92); // Cap at 92% to leave room for final steps
+        setProgress(Math.floor(progressValue));
+      }, 300); // Update every 300ms for smoother progress
+      
       const response = await fetch("/api/process", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ audioUrl, preferences: sessionPreferences }),
+        body: formData,
       });
+      
+      clearInterval(progressInterval);
+      // When API responds, we're likely at 85-92% depending on how long it took
+      // Set to 85% minimum, or keep current if higher
+      setProgress((prev) => Math.max(prev, 85));
+      await new Promise(resolve => setTimeout(resolve, 100)); // Small delay
 
       const payload = await response.json();
       if (!response.ok) {
@@ -256,55 +576,21 @@ export default function HomePage() {
         throw new Error("لم يتم العثور على مقاطع مناسبة.");
       }
 
+      setProgress(88);
+      setStatus("جاري تحضير المقاطع...");
+      await new Promise(resolve => setTimeout(resolve, 100)); // Small delay
+
       // Helper to extract transcript for a specific time range
       const getClipTranscript = (start: number, end: number): string => {
         return segments
-          .filter(seg => seg.end > start && seg.start < end)
-          .map(seg => seg.text)
+          .filter((seg) => seg.end > start && seg.start < end)
+          .map((seg) => seg.text)
           .join(" ");
       };
-
-      setStatus("نقوم بتجهيز المقاطع الآن...");
       const uploadedClips: ClipItem[] = [];
 
+      // Create clip candidates with metadata first (show results immediately)
       for (const candidate of candidates) {
-        const clipId = crypto.randomUUID();
-        const clipName = `clip-${clipId}.mp4`;
-        const thumbName = `thumb-${clipId}.jpg`;
-
-        // Extract video clip
-        const clipBlob = await clipVideoSegment(
-          ffmpeg,
-          inputName,
-          clipName,
-          candidate.start,
-          candidate.end,
-        );
-
-        // Extract thumbnail from first frame
-        const thumbBlob = await extractThumbnail(
-          ffmpeg,
-          inputName,
-          thumbName,
-          candidate.start,
-        );
-
-        // Upload clip to Vercel Blob
-        const clipFile = new File([clipBlob], clipName, { type: "video/mp4" });
-        const clipUpload = await upload(clipFile.name, clipFile, {
-          access: "public",
-          handleUploadUrl: "/api/upload",
-        });
-
-        // Upload thumbnail to Vercel Blob
-        const thumbFile = new File([thumbBlob], thumbName, {
-          type: "image/jpeg",
-        });
-        const thumbUpload = await upload(thumbFile.name, thumbFile, {
-          access: "public",
-          handleUploadUrl: "/api/upload",
-        });
-
         const duration = Math.max(0, candidate.end - candidate.start);
         const clipTranscript = getClipTranscript(
           candidate.start,
@@ -316,20 +602,68 @@ export default function HomePage() {
           start: candidate.start,
           end: candidate.end,
           duration,
-          url: clipUpload.url,
-          thumbnail: thumbUpload.url,
+          url: originalVideoUrl, // Use original video URL instead of clip URL
+          thumbnail: "", // Will be generated in parallel after results shown
           category: candidate.category || "عام",
           tags: Array.isArray(candidate.tags) ? candidate.tags : [],
           transcript: clipTranscript,
         });
       }
 
-      // Clean up input file to free memory
-      await cleanupInputFile(ffmpeg, inputName);
-
+      // Show results immediately (no waiting for thumbnails)
+      setProgress(92);
+      await new Promise(resolve => setTimeout(resolve, 150)); // Small delay to show progress
       setClips(uploadedClips);
+      setProgress(96);
+      await new Promise(resolve => setTimeout(resolve, 150)); // Small delay to show progress
       setStatus("");
+      setProgress(100);
+      await new Promise(resolve => setTimeout(resolve, 200)); // Final delay before showing results
       setScreen("results");
+
+      // Generate thumbnails in parallel in the background (non-blocking)
+      // Pass the original video file so we can re-write it if needed after the long API call
+      void generateThumbnailsInParallel(ffmpeg, inputName, uploadedClips, file)
+        .then((thumbnails) => {
+          console.log('[Thumbnails] Generated thumbnails:', thumbnails.length, 'URLs');
+          // Update clips with thumbnails as they're generated
+          setClips((prevClips) => {
+            const updatedClips = prevClips.map((clip, index) => {
+              const thumbnailUrl = thumbnails[index] || clip.thumbnail;
+              if (thumbnailUrl) {
+                console.log(`[Thumbnails] Setting thumbnail for clip ${index} (${clip.start}-${clip.end}):`, thumbnailUrl.substring(0, 50) + '...');
+              }
+              return {
+                ...clip,
+                thumbnail: thumbnailUrl,
+              };
+            });
+            // Also update sessionStorage with new thumbnails
+            if (typeof globalThis.window !== "undefined") {
+              globalThis.sessionStorage.setItem(
+                "reelify_clips",
+                JSON.stringify(updatedClips),
+              );
+            }
+            return updatedClips;
+          });
+        })
+        .catch((error) => {
+          console.error('[Thumbnails] Error generating thumbnails:', error);
+        })
+        .finally(() => {
+          // Clean up input file after thumbnails are generated
+          void cleanupInputFile(ffmpeg, inputName);
+        });
+
+      // Store clips data in sessionStorage for persistence
+      if (typeof globalThis.window !== "undefined") {
+        globalThis.sessionStorage.setItem(
+          "reelify_clips",
+          JSON.stringify(uploadedClips),
+        );
+        globalThis.sessionStorage.setItem("reelify_screen", "results");
+      }
     } catch (err) {
       console.error("Processing error:", err);
       let message = "تعذر إكمال المعالجة.";
@@ -342,23 +676,14 @@ export default function HomePage() {
       }
       setError(message);
       setStatus("");
+      setProgress(0);
       setScreen("form");
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleThumbnailLoad =
-    (clipUrl: string) => (event: React.SyntheticEvent<HTMLImageElement>) => {
-      const { naturalWidth, naturalHeight } = event.currentTarget;
-      if (!naturalWidth || !naturalHeight) return;
-      const isPortrait = naturalHeight >= naturalWidth;
-      setThumbnailPortraitMap(prev =>
-        prev[clipUrl] === isPortrait
-          ? prev
-          : { ...prev, [clipUrl]: isPortrait },
-      );
-    };
+  // Removed handleThumbnailLoad - no longer needed since we're using placeholders
 
   const handleSkipQuestions = async () => {
     setError("");
@@ -407,18 +732,21 @@ export default function HomePage() {
             <CardContent className="p-10">
               <form
                 className="flex flex-col items-center gap-8"
-                onSubmit={onUploadSubmit}>
+                onSubmit={onUploadSubmit}
+              >
                 <div className="w-full">
                   <label
                     htmlFor="video"
-                    className="group flex flex-col items-center justify-center w-full h-56 border-2 border-dashed border-primary/20 rounded-2xl cursor-pointer bg-primary/5 hover:bg-primary/10 hover:border-primary/40 transition-all duration-300 hover:scale-[1.01]">
+                    className="group flex flex-col items-center justify-center w-full h-56 border-2 border-dashed border-primary/20 rounded-2xl cursor-pointer bg-primary/5 hover:bg-primary/10 hover:border-primary/40 transition-all duration-300 hover:scale-[1.01]"
+                  >
                     <div className="flex flex-col items-center justify-center pt-6 pb-8">
                       <div className="w-16 h-16 mb-4 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                         <svg
                           className="w-8 h-8 text-primary"
                           fill="none"
                           stroke="currentColor"
-                          viewBox="0 0 24 24">
+                          viewBox="0 0 24 24"
+                        >
                           <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -441,7 +769,7 @@ export default function HomePage() {
                       type="file"
                       accept="video/*"
                       className="hidden"
-                      onChange={event => {
+                      onChange={(event) => {
                         const selectedFile = event.target.files?.[0] ?? null;
                         if (!selectedFile) {
                           setFile(null);
@@ -470,7 +798,8 @@ export default function HomePage() {
                           className="w-5 h-5"
                           fill="none"
                           stroke="currentColor"
-                          viewBox="0 0 24 24">
+                          viewBox="0 0 24 24"
+                        >
                           <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -487,7 +816,8 @@ export default function HomePage() {
                   type="submit"
                   disabled={!file}
                   size="lg"
-                  className="w-full max-w-sm text-white h-14 text-lg font-semibold bg-gradient-teal hover:shadow-teal hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 rounded-xl">
+                  className="w-full max-w-sm text-white h-14 text-lg font-semibold bg-gradient-teal hover:shadow-teal hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 rounded-xl"
+                >
                   متابعة
                 </Button>
                 {error && (
@@ -538,13 +868,14 @@ export default function HomePage() {
                   <Checkbox
                     id="skip-questions"
                     checked={skipQuestions}
-                    onCheckedChange={checked =>
+                    onCheckedChange={(checked) =>
                       setSkipQuestions(Boolean(checked))
                     }
                   />
                   <label
                     htmlFor="skip-questions"
-                    className="text-sm font-medium text-foreground">
+                    className="text-sm font-medium text-foreground"
+                  >
                     تخطي الأسئلة، دع الذكاء يقرر
                   </label>
                 </div>
@@ -553,7 +884,8 @@ export default function HomePage() {
                     type="button"
                     size="sm"
                     onClick={handleSkipQuestions}
-                    className="bg-gradient-teal text-white hover:shadow-teal hover:scale-[1.02] active:scale-[0.98] transition-all duration-200">
+                    className="bg-gradient-teal text-white hover:shadow-teal hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+                  >
                     ابدأ بدون أسئلة
                   </Button>
                 )}
@@ -566,7 +898,8 @@ export default function HomePage() {
                       className="w-4 h-4 text-white"
                       fill="none"
                       stroke="currentColor"
-                      viewBox="0 0 24 24">
+                      viewBox="0 0 24 24"
+                    >
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -587,7 +920,8 @@ export default function HomePage() {
                     className="w-5 h-5 text-red-500"
                     fill="none"
                     stroke="currentColor"
-                    viewBox="0 0 24 24">
+                    viewBox="0 0 24 24"
+                  >
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -672,14 +1006,16 @@ export default function HomePage() {
                             <svg
                               className="w-8 h-8"
                               viewBox="0 0 24 24"
-                              fill="currentColor">
+                              fill="currentColor"
+                            >
                               <defs>
                                 <linearGradient
                                   id="instagram-gradient"
                                   x1="0%"
                                   y1="100%"
                                   x2="100%"
-                                  y2="0%">
+                                  y2="0%"
+                                >
                                   <stop offset="0%" stopColor="#FFDC80" />
                                   <stop offset="25%" stopColor="#FCAF45" />
                                   <stop offset="50%" stopColor="#F77737" />
@@ -702,7 +1038,8 @@ export default function HomePage() {
                             <svg
                               className="w-8 h-8"
                               viewBox="0 0 24 24"
-                              fill="currentColor">
+                              fill="currentColor"
+                            >
                               <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />
                             </svg>
                           ),
@@ -715,7 +1052,8 @@ export default function HomePage() {
                             <svg
                               className="w-8 h-8 text-red-600"
                               viewBox="0 0 24 24"
-                              fill="currentColor">
+                              fill="currentColor"
+                            >
                               <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
                             </svg>
                           ),
@@ -728,7 +1066,8 @@ export default function HomePage() {
                             <svg
                               className="w-8 h-8 text-yellow-400"
                               viewBox="0 0 24 24"
-                              fill="currentColor">
+                              fill="currentColor"
+                            >
                               <path d="M12.206.793c.99 0 4.347.276 5.93 3.821.529 1.193.403 3.219.299 4.847l-.003.06c-.012.18-.022.345-.03.51.075.045.203.09.401.09.3-.016.659-.12 1.033-.301.165-.088.344-.104.464-.104.182 0 .359.029.509.09.45.149.734.479.734.838.015.449-.39.839-1.213 1.168-.089.029-.209.075-.344.119-.45.135-1.139.36-1.333.81-.09.224-.061.524.12.868l.015.015c.06.136 1.526 3.475 4.791 4.014.255.044.435.27.42.509 0 .075-.015.149-.045.225-.24.569-1.273.988-3.146 1.271-.059.091-.12.375-.164.57-.029.179-.074.36-.134.553-.076.271-.27.405-.555.405h-.03c-.135 0-.313-.031-.538-.074-.36-.075-.765-.135-1.273-.135-.3 0-.599.015-.913.074-.6.104-1.123.464-1.723.884-.853.599-1.826 1.288-3.294 1.288-.06 0-.119-.015-.18-.015h-.149c-1.468 0-2.427-.675-3.279-1.288-.599-.42-1.107-.779-1.707-.884-.314-.045-.629-.074-.928-.074-.54 0-.958.089-1.272.149-.211.043-.391.074-.54.074-.374 0-.523-.224-.583-.42-.061-.192-.09-.389-.135-.567-.046-.181-.105-.494-.166-.57-1.918-.222-2.95-.642-3.189-1.226-.031-.063-.052-.15-.055-.225-.015-.243.165-.465.42-.509 3.264-.54 4.73-3.879 4.791-4.02l.016-.029c.18-.345.224-.645.119-.869-.195-.434-.884-.658-1.332-.809-.121-.029-.24-.074-.346-.119-1.107-.435-1.257-.93-1.197-1.273.09-.479.674-.793 1.168-.793.146 0 .27.029.383.074.42.194.789.3 1.104.3.234 0 .384-.06.465-.105l-.046-.569c-.098-1.626-.225-3.651.307-4.837C7.392 1.077 10.739.807 11.727.807l.419-.015h.06z" />
                             </svg>
                           ),
@@ -741,7 +1080,8 @@ export default function HomePage() {
                             <svg
                               className="w-8 h-8 text-blue-600"
                               viewBox="0 0 24 24"
-                              fill="currentColor">
+                              fill="currentColor"
+                            >
                               <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
                             </svg>
                           ),
@@ -754,7 +1094,8 @@ export default function HomePage() {
                             <svg
                               className="w-8 h-8 text-[#0A66C2]"
                               viewBox="0 0 24 24"
-                              fill="currentColor">
+                              fill="currentColor"
+                            >
                               <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.35V9h3.414v1.561h.049c.476-.9 1.637-1.85 3.369-1.85 3.602 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 1 1 0-4.124 2.062 2.062 0 0 1 0 4.124zM6.828 20.452H3.84V9h2.988v11.452zM22.225 0H1.771C.792 0 0 .771 0 1.72v20.512C0 23.23.792 24 1.771 24h20.451C23.2 24 24 23.23 24 22.232V1.72C24 .771 23.2 0 22.222 0h.003z" />
                             </svg>
                           ),
@@ -780,7 +1121,8 @@ export default function HomePage() {
                               ? "border-primary bg-primary/10 shadow-teal"
                               : "border-transparent bg-muted/50 hover:bg-muted hover:border-primary/20"
                           }`}
-                          style={{ animationDelay: `${index * 0.1}s` }}>
+                          style={{ animationDelay: `${index * 0.1}s` }}
+                        >
                           <div className="w-10 h-10 flex items-center justify-center">
                             {option.icon}
                           </div>
@@ -792,7 +1134,8 @@ export default function HomePage() {
                               className="w-6 h-6 text-primary mr-auto"
                               fill="none"
                               stroke="currentColor"
-                              viewBox="0 0 24 24">
+                              viewBox="0 0 24 24"
+                            >
                               <path
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
@@ -830,7 +1173,8 @@ export default function HomePage() {
                                 ? "border-primary bg-primary/10 shadow-teal"
                                 : "border-transparent bg-muted/50 hover:bg-muted hover:border-primary/20"
                             }`}
-                            style={{ animationDelay: `${index * 0.1}s` }}>
+                            style={{ animationDelay: `${index * 0.1}s` }}
+                          >
                             <span className="text-3xl font-bold text-foreground block">
                               {duration}
                             </span>
@@ -866,7 +1210,8 @@ export default function HomePage() {
                               ? "border-primary bg-primary/10 shadow-teal"
                               : "border-transparent bg-muted/50 hover:bg-muted hover:border-primary/20"
                           }`}
-                          style={{ animationDelay: `${index * 0.1}s` }}>
+                          style={{ animationDelay: `${index * 0.1}s` }}
+                        >
                           <span className="text-3xl">{option.icon}</span>
                           <span className="font-semibold text-lg">
                             {option.value}
@@ -876,7 +1221,8 @@ export default function HomePage() {
                               className="w-6 h-6 text-primary mr-auto"
                               fill="none"
                               stroke="currentColor"
-                              viewBox="0 0 24 24">
+                              viewBox="0 0 24 24"
+                            >
                               <path
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
@@ -894,7 +1240,7 @@ export default function HomePage() {
                         <input
                           type="text"
                           value={audience}
-                          onChange={event => {
+                          onChange={(event) => {
                             setAudience(event.target.value);
                             setAudienceSkipped(false);
                           }}
@@ -918,11 +1264,12 @@ export default function HomePage() {
                             onClick={() => {
                               setAudience("");
                               setAudienceSkipped(true);
-                              setStep(current =>
+                              setStep((current) =>
                                 Math.min(totalSteps, current + 1),
                               );
                             }}
-                            className="text-primary hover:underline font-medium">
+                            className="text-primary hover:underline font-medium"
+                          >
                             تخطي هذا السؤال
                           </button>
                         </div>
@@ -953,7 +1300,8 @@ export default function HomePage() {
                               ? "border-primary bg-primary/10 shadow-teal"
                               : "border-transparent bg-muted/50 hover:bg-muted hover:border-primary/20"
                           }`}
-                          style={{ animationDelay: `${index * 0.1}s` }}>
+                          style={{ animationDelay: `${index * 0.1}s` }}
+                        >
                           <span className="text-3xl">{option.icon}</span>
                           <span className="font-semibold text-lg">
                             {option.label || option.value}
@@ -963,7 +1311,8 @@ export default function HomePage() {
                               className="w-6 h-6 text-primary mr-auto"
                               fill="none"
                               stroke="currentColor"
-                              viewBox="0 0 24 24">
+                              viewBox="0 0 24 24"
+                            >
                               <path
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
@@ -981,7 +1330,7 @@ export default function HomePage() {
                         <input
                           type="text"
                           value={tone}
-                          onChange={event => {
+                          onChange={(event) => {
                             setTone(event.target.value);
                             setToneSkipped(false);
                           }}
@@ -1005,11 +1354,12 @@ export default function HomePage() {
                             onClick={() => {
                               setTone("");
                               setToneSkipped(true);
-                              setStep(current =>
+                              setStep((current) =>
                                 Math.min(totalSteps, current + 1),
                               );
                             }}
-                            className="text-primary hover:underline font-medium">
+                            className="text-primary hover:underline font-medium"
+                          >
                             تخطي هذا السؤال
                           </button>
                         </div>
@@ -1050,7 +1400,8 @@ export default function HomePage() {
                               ? "border-primary bg-primary/10 shadow-teal"
                               : "border-transparent bg-muted/50 hover:bg-muted hover:border-primary/20"
                           }`}
-                          style={{ animationDelay: `${index * 0.1}s` }}>
+                          style={{ animationDelay: `${index * 0.1}s` }}
+                        >
                           <span className="text-3xl">{option.icon}</span>
                           <span className="font-semibold text-lg">
                             {option.label || option.value}
@@ -1060,7 +1411,8 @@ export default function HomePage() {
                               className="w-6 h-6 text-primary mr-auto"
                               fill="none"
                               stroke="currentColor"
-                              viewBox="0 0 24 24">
+                              viewBox="0 0 24 24"
+                            >
                               <path
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
@@ -1078,7 +1430,7 @@ export default function HomePage() {
                         <input
                           type="text"
                           value={hookStyle}
-                          onChange={event => {
+                          onChange={(event) => {
                             setHookStyle(event.target.value);
                             setHookStyleSkipped(false);
                           }}
@@ -1106,12 +1458,13 @@ export default function HomePage() {
                               if (step >= totalSteps) {
                                 void onStartProcessing();
                               } else {
-                                setStep(current =>
+                                setStep((current) =>
                                   Math.min(totalSteps, current + 1),
                                 );
                               }
                             }}
-                            className="text-primary hover:underline font-medium">
+                            className="text-primary hover:underline font-medium"
+                          >
                             تخطي هذا السؤال
                           </button>
                         </div>
@@ -1126,10 +1479,11 @@ export default function HomePage() {
                       variant="ghost"
                       size="lg"
                       onClick={() =>
-                        setStep(current => Math.max(1, current - 1))
+                        setStep((current) => Math.max(1, current - 1))
                       }
                       disabled={step === 1}
-                      className={`text-base px-6 ${step === 1 ? "invisible" : "hover:bg-muted"}`}>
+                      className={`text-base px-6 ${step === 1 ? "invisible" : "hover:bg-muted"}`}
+                    >
                       السابق
                     </Button>
                     {step < totalSteps ? (
@@ -1137,9 +1491,12 @@ export default function HomePage() {
                         type="button"
                         size="lg"
                         onClick={() =>
-                          setStep(current => Math.min(totalSteps, current + 1))
+                          setStep((current) =>
+                            Math.min(totalSteps, current + 1),
+                          )
                         }
-                        className="text-base px-8 text-white bg-gradient-teal hover:shadow-teal hover:scale-[1.02] active:scale-[0.98] transition-all duration-200">
+                        className="text-base px-8 text-white bg-gradient-teal hover:shadow-teal hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+                      >
                         التالي
                       </Button>
                     ) : (
@@ -1148,7 +1505,8 @@ export default function HomePage() {
                         size="lg"
                         onClick={onStartProcessing}
                         disabled={isProcessing}
-                        className="text-base text-white px-8 bg-gradient-coral hover:shadow-warm hover:scale-[1.02] active:scale-[0.98] transition-all duration-200">
+                        className="text-base text-white px-8 bg-gradient-coral hover:shadow-warm hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+                      >
                         {isProcessing ? "جارٍ التحويل..." : "ابدأ التحويل"}
                       </Button>
                     )}
@@ -1170,7 +1528,8 @@ export default function HomePage() {
                     className="w-10 h-10 text-white animate-bounce-soft"
                     fill="none"
                     stroke="currentColor"
-                    viewBox="0 0 24 24">
+                    viewBox="0 0 24 24"
+                  >
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -1192,25 +1551,62 @@ export default function HomePage() {
                   <p className="text-lg text-muted-foreground">
                     {status || "يرجى الانتظار قليلاً..."}
                   </p>
+                  {/* Platform-specific recommendations */}
+                  {currentRecommendations.length > 0 && (
+                    <div className="mt-6 p-5 bg-primary/5 rounded-xl border border-primary/20 shadow-sm">
+                      <div className="flex items-start gap-3">
+                        <div className="text-2xl">💡</div>
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-primary mb-2">
+                            نصائح لـ {platformLabels[platform] || platform}
+                          </p>
+                          <p 
+                            key={currentRecommendationIndex}
+                            className="text-sm text-muted-foreground leading-relaxed animate-fade-in"
+                          >
+                            {currentRecommendations[currentRecommendationIndex]}
+                          </p>
+                          {currentRecommendations.length > 1 && (
+                            <div className="flex gap-1.5 mt-3 justify-center">
+                              {currentRecommendations.map((rec: string, index: number) => (
+                                <div
+                                  key={`rec-${platform}-${index}-${rec.substring(0, 10)}`}
+                                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                                    index === currentRecommendationIndex
+                                      ? "w-6 bg-primary"
+                                      : "w-1.5 bg-primary/30"
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="max-w-md mx-auto space-y-2">
+                <div className="max-w-md mx-auto space-y-3">
                   <div className="h-3 bg-muted rounded-full overflow-hidden">
                     <div
-                      className="h-full progress-gradient rounded-full animate-pulse"
-                      style={{ width: "66%" }}
+                      className="h-full progress-gradient rounded-full transition-all duration-300 ease-out"
+                      style={{ width: `${progress}%` }}
                     />
                   </div>
+                  <p className="text-sm text-muted-foreground font-medium">
+                    {progress}%
+                  </p>
                 </div>
               </CardContent>
             </Card>
 
             {/* Skeleton Cards Preview */}
             <div className="grid gap-6 grid-cols-2 lg:grid-cols-3">
-              {[1, 2, 3].map(i => (
+              {[1, 2, 3].map((i) => (
                 <Card
                   key={i}
                   className="overflow-hidden shadow-card border-0 bg-gradient-card animate-fade-in"
-                  style={{ animationDelay: `${i * 0.2}s` }}>
+                  style={{ animationDelay: `${i * 0.2}s` }}
+                >
                   {/* Thumbnail Skeleton - 9:16 vertical aspect ratio */}
                   <div className="aspect-[9/16] skeleton" />
                   {/* Content Skeleton */}
@@ -1238,7 +1634,8 @@ export default function HomePage() {
                   className="w-8 h-8 text-white"
                   fill="none"
                   stroke="currentColor"
-                  viewBox="0 0 24 24">
+                  viewBox="0 0 24 24"
+                >
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -1261,42 +1658,68 @@ export default function HomePage() {
             ) : (
               <div className="grid gap-8 grid-cols-2 lg:grid-cols-3">
                 {clips.map((clip, index) => {
-                  const previewParams = new URLSearchParams({
-                    url: clip.url,
+                  // Navigate to editor with pre-selected start/end times
+                  // Don't pass blob URLs in params - editor will get video from IndexedDB
+                  const editorParams = new URLSearchParams({
+                    // Only pass videoUrl if it's NOT a blob URL (e.g., Vercel Blob URL)
+                    // For blob URLs, editor will retrieve from IndexedDB
+                    ...(clip.url && !clip.url.startsWith('blob:') ? { videoUrl: clip.url } : {}),
+                    startTime: String(clip.start),
+                    endTime: String(clip.end),
                     title: clip.title,
-                    duration: String(Math.round(clip.duration)),
                     thumbnail: clip.thumbnail,
                     category: clip.category,
                     tags: clip.tags.join(","),
                     transcript: clip.transcript,
                   });
-                  const previewUrl = `/preview?${previewParams.toString()}`;
-                  const isPortrait = thumbnailPortraitMap[clip.url];
-                  const wrapperClass = `aspect-[9/16] relative overflow-hidden ${
-                    isPortrait === false ? "bg-black" : "bg-muted"
-                  }`;
-                  const imageClass = `w-full h-full transition-transform duration-500 group-hover:scale-110 ${
-                    isPortrait === false ? "object-contain" : "object-cover"
-                  }`;
+                  const editorUrl = `/editor?${editorParams.toString()}`;
+                  const wrapperClass = `aspect-[9/16] relative overflow-hidden cursor-pointer bg-gradient-to-br from-primary/10 to-primary/5`;
                   return (
                     <Card
-                      key={clip.url}
+                      key={`${clip.start}-${clip.end}-${index}`}
                       className="overflow-hidden shadow-card border-0 bg-gradient-card group hover:shadow-card-hover hover:scale-[1.03] transition-all duration-500 animate-fade-in"
-                      style={{ animationDelay: `${index * 0.15}s` }}>
-                      <div className={wrapperClass}>
-                        <img
-                          src={clip.thumbnail}
-                          alt={clip.title}
-                          onLoad={handleThumbnailLoad(clip.url)}
-                          className={imageClass}
-                        />
+                      style={{ animationDelay: `${index * 0.15}s` }}
+                    >
+                      <button
+                        type="button"
+                        className={wrapperClass}
+                        onClick={() => {
+                          router.push(editorUrl);
+                        }}
+                        aria-label={`تحرير المقطع: ${clip.title}`}
+                      >
+                        {/* Show thumbnail if available, otherwise show loading placeholder */}
+                        {clip.thumbnail ? (
+                          <img
+                            src={clip.thumbnail}
+                            alt={clip.title}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              // If thumbnail fails to load, try to get from IndexedDB
+                              const loadThumbnail = async () => {
+                                const clipKey = `thumb-${clip.start}-${clip.end}`;
+                                const thumbnailUrl = await getThumbnailBlobUrl(clipKey);
+                                if (thumbnailUrl) {
+                                  (e.target as HTMLImageElement).src = thumbnailUrl;
+                                }
+                              };
+                              void loadThumbnail();
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/5 animate-pulse">
+                            {/* Skeleton loader */}
+                            <div className="w-full h-full bg-gradient-to-br from-gray-200 via-gray-100 to-gray-200 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800"></div>
+                          </div>
+                        )}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                         <div className="absolute inset-0 flex items-center justify-center">
                           <div className="w-16 h-16 rounded-full bg-white/95 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 transform scale-75 group-hover:scale-100 shadow-xl">
                             <svg
                               className="w-7 h-7 text-primary mr-[-3px]"
                               fill="currentColor"
-                              viewBox="0 0 24 24">
+                              viewBox="0 0 24 24"
+                            >
                               <path d="M8 5v14l11-7z" />
                             </svg>
                           </div>
@@ -1305,7 +1728,11 @@ export default function HomePage() {
                         <div className="absolute bottom-3 left-3 px-2.5 py-1 rounded-lg bg-black/70 text-white text-xs font-medium backdrop-blur-sm">
                           {Math.round(clip.duration)} ثانية
                         </div>
-                      </div>
+                        {/* Rank Badge */}
+                        <div className="absolute top-3 right-3 px-2.5 py-1 rounded-lg bg-primary/90 text-white text-xs font-bold backdrop-blur-sm">
+                          #{index + 1}
+                        </div>
+                      </button>
                       <CardContent className="p-5 space-y-4">
                         <div className="space-y-2">
                           <span className="inline-block px-3 py-1 text-xs font-semibold bg-primary/10 text-primary rounded-full">
@@ -1316,14 +1743,25 @@ export default function HomePage() {
                           </h3>
                         </div>
                         <Button
-                          asChild
-                          className="w-full h-12 text-white text-base font-semibold bg-gradient-teal hover:shadow-teal hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 rounded-xl">
-                          <a
-                            href={previewUrl}
-                            target="_blank"
-                            rel="noopener noreferrer">
-                            معاينة وتحميل
-                          </a>
+                          onClick={() => {
+                            router.push(editorUrl);
+                          }}
+                          className="w-full h-12 text-white text-base font-semibold bg-gradient-teal hover:shadow-teal hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 rounded-xl"
+                        >
+                          <svg
+                            className="w-5 h-5 ml-2"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                            />
+                          </svg>
+                          تحرير وتصدير
                         </Button>
                       </CardContent>
                     </Card>

@@ -21,6 +21,10 @@ export function useVideoPlayer(videoUrl: string | null) {
 
     const video = videoRef.current;
     
+    // Cancel any pending play() promises when URL changes
+    // This prevents AbortError when navigating between reels
+    video.pause();
+    
     // Set crossOrigin for CORS support (needed for canvas operations)
     video.crossOrigin = 'anonymous';
     
@@ -159,6 +163,15 @@ export function useVideoPlayer(videoUrl: string | null) {
       
       if (playPromise !== undefined) {
         playPromise.catch((err) => {
+          // AbortError is expected when video URL changes (navigation between reels)
+          // Don't treat it as a real error
+          if (err instanceof Error && err.name === 'AbortError') {
+            // This is normal - the play() was interrupted by a new load request
+            // Just reset playing state, don't log as error
+            setIsPlaying(false);
+            return;
+          }
+          // For other errors, log and handle normally
           console.error('Error playing video:', err);
           setError(err instanceof Error ? err : new Error('Failed to play video'));
           setIsPlaying(false);

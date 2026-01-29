@@ -8,6 +8,7 @@ export type ClipCandidate = {
   end: number;
   category: string;
   tags: string[];
+  score?: number; // Quality score from 0-100
 };
 
 const cleanJsonText = (raw: string) => {
@@ -74,10 +75,23 @@ export async function generateClipCandidates(
     throw new Error("Missing GEMINI_API_KEY");
   }
 
-  const modelName = process.env.GEMINI_MODEL || "gemini-2.5-pro";
+  // Use gemini-3-flash-preview as default (fastest and working model)
+  // Available models (2025): gemini-3-flash-preview, gemini-3-pro-preview, gemini-1.5-pro
+  // Note: gemini-pro, gemini-2.5-flash, and gemini-1.5-flash are not available
+  let modelName = process.env.GEMINI_MODEL;
+  
+  // Fix invalid model names - map to available alternatives
+  if (!modelName || modelName === "gemini-2.5-flash" || modelName === "gemini-pro" || modelName === "gemini-1.5-flash") {
+    // Default to gemini-3-flash-preview (fastest and working)
+    modelName = "gemini-3-flash-preview";
+    console.log(`[Gemini] Using default model: ${modelName} (fastest available)`);
+  }
+  
+  console.log(`[Gemini] Using model: ${modelName}`);
   const client = new GoogleGenerativeAI(apiKey);
   const model = client.getGenerativeModel({ model: modelName });
 
+  // Use all segments - don't filter anything from transcription
   const transcript = segments
     .map(
       (segment) =>
@@ -102,42 +116,131 @@ export async function generateClipCandidates(
       ? `\nتفضيلات المستخدم:\n${preferenceLines.join("\n")}\n`
       : "";
 
+  // Get platform-specific recommendations
+  const platformRecommendations: Record<string, string> = {
+    instagram: "Instagram Reels: Focus on visually engaging moments, trending audio compatibility, and strong first 3 seconds. Prefer 15-30 second hooks. Use hashtags relevant to Instagram trends.",
+    tiktok: "TikTok: Prioritize viral potential, trending topics, and authentic moments. Strong hooks are critical. Prefer 15-60 second clips. Consider TikTok's algorithm preferences for engagement.",
+    youtube: "YouTube Shorts: Focus on educational value, clear takeaways, and strong CTA. Prefer 30-60 second clips. Ensure content is suitable for YouTube's broader audience.",
+    snapchat: "Snapchat Spotlight: Prioritize quick, attention-grabbing moments. Prefer 15-30 second clips. Focus on authentic, raw content that resonates with younger audiences.",
+    facebook: "Facebook Reels: Focus on community engagement and shareable content. Prefer 30-60 second clips. Consider Facebook's diverse age demographics.",
+    linkedin: "LinkedIn: Prioritize professional value, insights, and thought leadership. Prefer 30-90 second clips. Focus on educational or inspirational content suitable for professional networks."
+  };
+
+  const platform = preferences?.platform || "instagram";
+  const platformRec = platformRecommendations[platform] || platformRecommendations.instagram;
+
+  // Optimized prompt asking for as many clips as possible with scores >= 65
   const prompt = `
-أنت محرر فيديو محترف متخصص في المقاطع القصيرة.
-المحتوى التالي تفريغ عربي مع الطوابع الزمنية. اختر أفضل 3 مقاطع فقط بطول 30 إلى 90 ثانية.
-أعد النتيجة بصيغة JSON فقط، بدون أي شرح إضافي.
-الشكل المطلوب: [{"title":"...","start":0,"end":0,"category":"...","tags":["...","..."]}]
-يجب أن تكون النتيجة 3 مقاطع بالضبط.
+You are a professional short-form video editor specializing in ${platform} content.
+The following text is a timestamped transcript. Auto-detect its language AND dialect/accent style. Extract highlight segments of 30–90 seconds and rank best → worst.
 
-شروط العناوين:
-- عربية فصيحة وطبيعية (لغة عربية معيارية).
-- قصيرة وجذابة ومناسبة لريلز.
-- لا تترجم إلى الإنجليزية.
+PLATFORM-SPECIFIC RECOMMENDATIONS:
+${platformRec}
 
-معايير اختيار المقاطع (الترتيب حسب الأهمية):
-1) خطّاف قوي في أول 3-5 ثوانٍ (سؤال جذاب، وعد واضح، رقم قوي، أو مفاجأة).
-2) بداية ونهاية بجملة مكتملة (تجنب القطع وسط الكلام).
-3) قيمة أو نتيجة واضحة خلال المقطع (فائدة، فكرة قوية، أو لحظة مؤثرة).
-4) وضوح وسلاسة السرد (بدون تشويش أو قفزات مفاجئة).
+Return ONLY valid JSON — no explanations.
+Format:
+[{"title":"...","start":0,"end":0,"category":"...","tags":["..."],"score":75}]
 
-التقييم الداخلي:
-- قيّم كل مقطع بدرجة من 1 إلى 10 لخطّاف البداية (Hook Score).
-- اختر أعلى 3 مقاطع حسب درجة الخطّاف ثم الجودة العامة.
+CRITICAL: Return ALL viable segments with score >= 65. Do NOT limit the number.
+Extract EVERY segment from the transcript that meets the quality threshold (score >= 65).
+There is NO maximum limit - return as many as you find.
+Sort descending by quality (best first, worst last).
 
-التصنيف (category):
-اختر تصنيفاً واحداً لكل مقطع من: تعليمي، ترفيهي، تحفيزي، إخباري، ديني، رياضي، تقني، اجتماعي
+Titles & tags:
+- Use SAME language and SAME dialect/accent as transcript.
+- Short, natural, catchy, reel-style optimized for ${platform}.
+- Do not translate or normalize style.
+- Consider ${platform} audience preferences and trends.
 
-الوسوم (tags):
-أضف 3-5 وسوم عربية مناسبة لكل مقطع تصف المحتوى.
+Selection priority:
+1) Strong hook in first 3–5 seconds (critical for ${platform}).
+2) Clean sentence boundaries.
+3) Clear value/payoff.
+4) Smooth flow.
+5) ${platform}-specific engagement factors.
+
+Scoring:
+- Score 0–100.
+- Internally rate hook (1–10) - especially important for ${platform}.
+- Rank by: hook → overall quality → value → ${platform} optimization.
+
+Category:
+Choose one relevant category in the SAME language, considering ${platform} content categories.
+
+Tags:
+Add 3–5 relevant tags in the SAME language and dialect, optimized for ${platform} discovery.
 
 ${preferenceBlock}
-النص المفروغ:
+Transcript:
 ${transcript}
   `.trim();
 
-  const result = await model.generateContent(prompt);
-  const text = result.response.text();
+  const geminiStart = Date.now();
+  console.log(`[Gemini] Starting clip generation (${segments.length} segments, ${transcript.length} chars)`);
+  
+  let result;
+  let text;
+  const fallbackModels = ["gemini-1.5-pro", "gemini-3-flash-preview", "gemini-3-pro-preview"];
+  let currentModelName = modelName;
+  
+  // Configure generation to maximize outputs and speed
+  const generationConfig = {
+    temperature: 0.5, // Lower temperature for faster, more consistent results
+    topP: 0.9,
+    topK: 32,
+    maxOutputTokens: 16384, // Maximum tokens to allow many clips in response
+  };
+  
+  try {
+    result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig,
+    });
+    text = result.response.text();
+  } catch (error: unknown) {
+    // If model fails with 404, try fallback models in order
+    if (error instanceof Error && (error.message.includes("404") || error.message.includes("not found"))) {
+      console.warn(`[Gemini] Model ${currentModelName} not available, trying fallback models...`);
+      
+      for (const fallbackModelName of fallbackModels) {
+        if (currentModelName === fallbackModelName) continue; // Skip if already tried
+        try {
+          console.log(`[Gemini] Trying fallback model: ${fallbackModelName}`);
+          const fallbackClient = new GoogleGenerativeAI(apiKey);
+          const fallbackModel = fallbackClient.getGenerativeModel({ model: fallbackModelName });
+          result = await fallbackModel.generateContent({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig,
+          });
+          text = result.response.text();
+          console.log(`[Gemini] Successfully used fallback model: ${fallbackModelName}`);
+          break;
+        } catch (fallbackError) {
+          console.warn(`[Gemini] Fallback model ${fallbackModelName} also failed, trying next...`);
+          continue;
+        }
+      }
+      
+      // If all fallbacks failed, throw original error
+      if (!text) {
+        throw new Error(`All Gemini models failed. Tried: ${currentModelName}, ${fallbackModels.join(", ")}. Error: ${error.message}`);
+      }
+    } else {
+      throw error;
+    }
+  }
+  
+  const geminiTime = Date.now() - geminiStart;
+  console.log(`[Gemini] Generation completed in ${geminiTime}ms`);
+  
   const parsed = parseGeminiJson(text);
+  console.log(`[Gemini] Parsed ${parsed.length} clip candidates from response`);
+  
+  // Log scores if available
+  if (parsed.length > 0 && parsed[0].score !== undefined) {
+    const scores = parsed.map((c: any) => c.score).filter((s: any) => s !== undefined);
+    console.log(`[Gemini] Score range: ${Math.min(...scores)} - ${Math.max(...scores)}`);
+  }
 
   const snapStartToSegment = (time: number) => {
     for (let i = segments.length - 1; i >= 0; i -= 1) {
@@ -171,6 +274,7 @@ ${transcript}
     const start = Number.isFinite(rawStart) ? snapStartToSegment(rawStart) : rawStart;
     const end = Number.isFinite(rawEnd) ? snapEndToSegment(rawEnd) : rawEnd;
     const safeEnd = end > start ? end : rawEnd;
+    const score = Number.isFinite(Number(clip.score)) ? Number(clip.score) : undefined;
     return {
       title: String(clip.title ?? "").trim(),
       start,
@@ -178,7 +282,8 @@ ${transcript}
       category: String(clip.category ?? "عام").trim(),
       tags: Array.isArray(clip.tags)
         ? clip.tags.map((tag: unknown) => String(tag).trim()).filter(Boolean)
-        : []
+        : [],
+      score
     };
   });
 
@@ -193,8 +298,23 @@ ${transcript}
     return duration >= 30 && duration <= 90;
   };
 
-  const withDuration = normalized.filter((clip) => isBasicValid(clip) && isDurationValid(clip));
-  const fallback = normalized.filter(isBasicValid);
+  const hasGoodScore = (clip: ClipCandidate) => {
+    // Filter out clips with score < 65 (if score is provided)
+    if (clip.score !== undefined) {
+      return clip.score >= 65;
+    }
+    // If no score provided, include the clip (backward compatibility)
+    return true;
+  };
 
-  return (withDuration.length >= 3 ? withDuration : fallback).slice(0, 3);
+  // Filter clips: valid duration, good score (>= 50), and basic validation
+  const validClips = normalized.filter(
+    (clip) => isBasicValid(clip) && isDurationValid(clip) && hasGoodScore(clip)
+  );
+
+  console.log(`[Gemini] Filtered clips: ${normalized.length} -> ${validClips.length} (score >= 65)`);
+
+  // Return all valid clips ranked from best to worst (as returned by Gemini)
+  // Gemini already ranks them, so we just return them in order
+  return validClips.length > 0 ? validClips : normalized.filter(isBasicValid);
 }

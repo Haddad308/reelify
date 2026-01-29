@@ -1,5 +1,4 @@
-import { readFile } from "fs/promises";
-import path from "path";
+import { readFile } from "node:fs/promises";
 
 export type TranscriptSegment = {
   start: number;
@@ -25,7 +24,9 @@ const normalizeTime = (value?: number) => {
   return value > 1000 ? value / 1000 : value;
 };
 
-const buildSegmentsFromWords = (words: ElevenLabsWord[]): TranscriptSegment[] => {
+const buildSegmentsFromWords = (
+  words: ElevenLabsWord[],
+): TranscriptSegment[] => {
   const segments: TranscriptSegment[] = [];
   let currentWords: string[] = [];
   let segmentStart = 0;
@@ -36,7 +37,7 @@ const buildSegmentsFromWords = (words: ElevenLabsWord[]): TranscriptSegment[] =>
     segments.push({
       start: segmentStart,
       end: segmentEnd,
-      text: currentWords.join(" ").trim()
+      text: currentWords.join(" ").trim(),
     });
     currentWords = [];
   };
@@ -64,26 +65,47 @@ const buildSegmentsFromWords = (words: ElevenLabsWord[]): TranscriptSegment[] =>
   return segments;
 };
 
-export async function transcribeAudio(filePath: string): Promise<TranscriptSegment[]> {
+// Transcribe from local file path
+export async function transcribeAudioFromUrl(
+  filePath: string,
+  originalUrl: string,
+): Promise<TranscriptSegment[]> {
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) {
     throw new Error("Missing ELEVENLABS_API_KEY");
   }
 
-  const fileBuffer = await readFile(filePath);
-  const fileBlob = new Blob([fileBuffer]);
+  // Read file into Buffer
+  const audioBuffer = await readFile(filePath);
+  const fileSizeMB = (audioBuffer.length / 1024 / 1024).toFixed(2);
+  
+  // Use scribe_v2 for faster transcription (newer and faster than scribe_v1)
+  // Available models: scribe_v1, scribe_v1_experimental, scribe_v2
+  const modelId = process.env.ELEVENLABS_STT_MODEL || "scribe_v2";
+  console.log(`[ElevenLabs] Using model: ${modelId}`);
+  
+  // Create FormData compatible with fetch API
+  // Convert Buffer to Blob for FormData
+  const audioBlob = new Blob([audioBuffer], { type: "audio/mpeg" });
   const formData = new FormData();
-  formData.append("model_id", "scribe_v1");
+  
+  formData.append("model_id", modelId);
   formData.append("timestamps_granularity", "word");
-  formData.append("file", fileBlob, path.basename(filePath));
+  formData.append("file", audioBlob, "audio.mp3");
 
+  const requestStart = Date.now();
+  console.log(`[ElevenLabs] Starting transcription request from local file (${fileSizeMB}MB)`);
+  
   const response = await fetch(API_URL, {
     method: "POST",
     headers: {
-      "xi-api-key": apiKey
+      "xi-api-key": apiKey,
     },
-    body: formData
+    body: formData,
   });
+  
+  const requestTime = Date.now() - requestStart;
+  console.log(`[ElevenLabs] Transcription request completed in ${requestTime}ms`);
 
   if (!response.ok) {
     const details = await response.text();
@@ -99,13 +121,21 @@ export async function transcribeAudio(filePath: string): Promise<TranscriptSegme
 
   const segments: TranscriptSegment[] = Array.isArray(data?.segments)
     ? data.segments
-      .map((segment: any) => ({
-        start: normalizeTime(segment.start),
-        end: normalizeTime(segment.end),
-        text: String(segment.text ?? "").trim()
-      }))
-      .filter((segment: TranscriptSegment) => segment.text)
+        .map((segment: any) => ({
+          start: normalizeTime(segment.start),
+          end: normalizeTime(segment.end),
+          text: String(segment.text ?? "").trim(),
+        }))
+        .filter((segment: TranscriptSegment) => segment.text)
     : buildSegmentsFromWords(words);
 
   return segments.filter((segment) => segment.text);
+}
+
+// Keep original function for backward compatibility
+// Note: This function now uses transcribeAudioFromUrl which reads the file directly
+export async function transcribeAudio(
+  filePath: string,
+): Promise<TranscriptSegment[]> {
+  return transcribeAudioFromUrl(filePath, "");
 }
