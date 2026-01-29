@@ -208,7 +208,6 @@ export function ExportButton({
         window.open(postUrl, '_blank');
       }
 
-      onExportSuccess?.(result);
     } catch (error) {
       console.error('Publish failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Publishing failed';
