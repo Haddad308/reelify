@@ -247,12 +247,13 @@ export function buildFFmpegCommand(
   const visibleCaptions = captions.filter((caption) => caption.isVisible);
   const hasCaptions = visibleCaptions.length > 0;
   
-  // Use stream copy mode when:
-  // 1. useStreamCopy flag is true
-  // 2. No captions need to be rendered
-  // Stream copy is nearly instant as it doesn't re-encode the video
+  // Use stream copy when no captions are needed - this is much faster
+  // Stream copy can only cut at keyframes, but for most videos this is acceptable
   const shouldUseStreamCopy = useStreamCopy && !hasCaptions;
   
+  // Use INPUT SEEKING (-ss BEFORE -i) for fast seeking
+  // This seeks in the input stream without decoding, making it much faster
+  // The slight frame inaccuracy at keyframe boundaries is acceptable for most use cases
   const args: string[] = [
     '-ss',
     startTime.toString(),
@@ -264,6 +265,7 @@ export function buildFFmpegCommand(
 
   if (shouldUseStreamCopy) {
     // Stream copy mode - no re-encoding, nearly instant
+    // With input seeking (-ss before -i), cuts may be at keyframes but this is fast
     args.push('-c', 'copy');
   } else {
     // Re-encoding mode - needed for filters (scale, captions)

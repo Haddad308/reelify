@@ -118,7 +118,23 @@ export function useAuthStatus(): UseAuthStatusReturn {
       // Refresh auth status after successful auth
       checkAuth(authSuccess as Platform);
       
-      // Clean up URL
+      // Try to restore the original URL that was saved before OAuth redirect
+      const savedReturnUrl = sessionStorage.getItem('auth_return_url');
+      if (savedReturnUrl) {
+        sessionStorage.removeItem('auth_return_url');
+        
+        // Parse the saved URL and add auth_success param (already processed)
+        const returnUrl = new URL(savedReturnUrl);
+        
+        // If the saved URL is different from current (has more params), restore it
+        if (returnUrl.pathname === window.location.pathname) {
+          // Restore the original URL with all its parameters
+          window.history.replaceState({}, '', savedReturnUrl);
+          return; // Exit early, the URL is restored
+        }
+      }
+      
+      // Fallback: just clean up the auth_success param from current URL
       const newUrl = new URL(window.location.href);
       newUrl.searchParams.delete('auth_success');
       window.history.replaceState({}, '', newUrl.toString());
@@ -126,6 +142,9 @@ export function useAuthStatus(): UseAuthStatusReturn {
 
     if (authError) {
       console.error('Authentication error:', authError);
+      
+      // Clear saved return URL on error
+      sessionStorage.removeItem('auth_return_url');
       
       // Clean up URL
       const newUrl = new URL(window.location.href);
