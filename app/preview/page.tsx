@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
-import { Suspense, useState, useMemo, useEffect } from "react";
+import { Suspense, useState, useMemo, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ReelClipInput } from "@/types";
@@ -25,6 +25,7 @@ function PreviewContent() {
   const [url, setUrl] = useState<string | null>(urlParam);
   const [urlLoadDone, setUrlLoadDone] = useState(!!urlParam);
   const [isPortrait, setIsPortrait] = useState<boolean | null>(null);
+  const firstReelSegmentRef = useRef<HTMLSpanElement | null>(null);
 
   // When no URL in params (e.g. blob not passed), try IndexedDB
   useEffect(() => {
@@ -130,6 +131,40 @@ function PreviewContent() {
       reelEnd: endTime,
     };
   }, [fullTranscriptParam, segmentsParam, startTimeParam, endTimeParam]);
+
+  // Reel-only text for the excerpt block when full transcript is shown
+  const reelExcerptText = useMemo(() => {
+    if (!fullTranscriptSegments) return "";
+    return fullTranscriptSegments.segments
+      .filter(
+        seg =>
+          seg.start < fullTranscriptSegments.reelEnd &&
+          seg.end > fullTranscriptSegments.reelStart,
+      )
+      .map(seg => seg.text)
+      .join(" ");
+  }, [fullTranscriptSegments]);
+
+  // Index of the first segment that is inside the reel range (for scroll-into-view ref)
+  const firstReelSegmentIndex = useMemo(() => {
+    if (!fullTranscriptSegments) return -1;
+    return fullTranscriptSegments.segments.findIndex(
+      seg =>
+        seg.start < fullTranscriptSegments.reelEnd &&
+        seg.end > fullTranscriptSegments.reelStart,
+    );
+  }, [fullTranscriptSegments]);
+
+  // Auto-scroll transcript so the first highlighted (reel) segment is in view
+  useEffect(() => {
+    if (!fullTranscriptSegments || firstReelSegmentIndex < 0) return;
+    const el = firstReelSegmentRef.current;
+    if (!el) return;
+    const id = requestAnimationFrame(() => {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [fullTranscriptSegments, firstReelSegmentIndex]);
 
   if (!urlLoadDone) {
     return (
@@ -371,6 +406,16 @@ function PreviewContent() {
                     </svg>
                     النص المفرّغ
                   </h3>
+                  {fullTranscriptSegments && reelExcerptText && (
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-semibold text-foreground/70">
+                        المقطع المحدد (الريل)
+                      </p>
+                      <div className="p-4 bg-amber-200/90 dark:bg-amber-400/40 rounded-2xl text-base text-foreground leading-relaxed border border-amber-300/50 dark:border-amber-500/30">
+                        {reelExcerptText}
+                      </div>
+                    </div>
+                  )}
                   <div className="p-5 bg-muted/50 rounded-2xl text-base text-foreground/80 leading-relaxed max-h-40 overflow-y-auto border border-border/50">
                     {fullTranscriptSegments ? (
                       fullTranscriptSegments.segments.map((seg, i) => {
@@ -381,6 +426,11 @@ function PreviewContent() {
                           <span key={i}>
                             {isReel ? (
                               <span
+                                ref={
+                                  i === firstReelSegmentIndex
+                                    ? firstReelSegmentRef
+                                    : undefined
+                                }
                                 className="bg-amber-200/90 dark:bg-amber-400/40 text-foreground rounded px-1 py-0.5 font-medium"
                                 title="نص المقطع (الريل)">
                                 {seg.text}
