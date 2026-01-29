@@ -226,6 +226,14 @@ export function buildCaptionFilters(
 
 /**
  * Build FFmpeg export command arguments
+ * 
+ * @param startTime - Start time for trimming
+ * @param duration - Duration of the output video
+ * @param captions - Array of captions to overlay
+ * @param settings - Export quality settings
+ * @param inputFile - Input file name in FFmpeg virtual filesystem
+ * @param outputFile - Output file name in FFmpeg virtual filesystem
+ * @param useStreamCopy - If true and no captions, use stream copy for near-instant trimming
  */
 export function buildFFmpegCommand(
   startTime: number,
@@ -233,8 +241,18 @@ export function buildFFmpegCommand(
   captions: Caption[],
   settings: ExportSettings,
   inputFile: string = 'input.mp4',
-  outputFile: string = 'output.mp4'
+  outputFile: string = 'output.mp4',
+  useStreamCopy: boolean = false
 ): string[] {
+  const visibleCaptions = captions.filter((caption) => caption.isVisible);
+  const hasCaptions = visibleCaptions.length > 0;
+  
+  // Use stream copy mode when:
+  // 1. useStreamCopy flag is true
+  // 2. No captions need to be rendered
+  // Stream copy is nearly instant as it doesn't re-encode the video
+  const shouldUseStreamCopy = useStreamCopy && !hasCaptions;
+  
   const args: string[] = [
     '-ss',
     startTime.toString(),
@@ -244,38 +262,41 @@ export function buildFFmpegCommand(
     duration.toString(),
   ];
 
-  // Build video filter complex
-  const [width, height] = settings.resolution.split('x').map(Number);
-  const filterParts: string[] = [];
-  
-  // Add scale filter for resolution first
-  filterParts.push(`scale=${width}:${height}`);
-  
-  // Add caption filters if any (chained after scale)
-  // Multiple drawtext filters can be chained with commas
-  if (captions.length > 0) {
-    const captionFilters = captions
-      .filter((caption) => caption.isVisible)
-      .map((caption) => buildCaptionFilter(caption, startTime, width, height));
+  if (shouldUseStreamCopy) {
+    // Stream copy mode - no re-encoding, nearly instant
+    args.push('-c', 'copy');
+  } else {
+    // Re-encoding mode - needed for filters (scale, captions)
+    const [width, height] = settings.resolution.split('x').map(Number);
+    const filterParts: string[] = [];
     
-    if (captionFilters.length > 0) {
-      filterParts.push(...captionFilters);
+    // Add scale filter for resolution first
+    filterParts.push(`scale=${width}:${height}`);
+    
+    // Add caption filters if any (chained after scale)
+    if (hasCaptions) {
+      const captionFilters = visibleCaptions
+        .map((caption) => buildCaptionFilter(caption, startTime, width, height));
+      
+      if (captionFilters.length > 0) {
+        filterParts.push(...captionFilters);
+      }
     }
+
+    if (filterParts.length > 0) {
+      args.push('-vf', filterParts.join(','));
+    }
+
+    // Video codec settings
+    args.push('-c:v', settings.videoCodec);
+    args.push('-preset', settings.preset);
+    args.push('-crf', settings.crf.toString());
+    args.push('-r', settings.fps.toString());
+
+    // Audio codec settings
+    args.push('-c:a', settings.audioCodec);
+    args.push('-b:a', settings.audioBitrate);
   }
-
-  if (filterParts.length > 0) {
-    args.push('-vf', filterParts.join(','));
-  }
-
-  // Video codec settings
-  args.push('-c:v', settings.videoCodec);
-  args.push('-preset', settings.preset);
-  args.push('-crf', settings.crf.toString());
-  args.push('-r', settings.fps.toString());
-
-  // Audio codec settings
-  args.push('-c:a', settings.audioCodec);
-  args.push('-b:a', settings.audioBitrate);
 
   // Output file
   args.push(outputFile);
@@ -285,6 +306,10 @@ export function buildFFmpegCommand(
 
 /**
  * Get export settings based on quality preset
+ * 
+ * Note: Using faster presets (ultrafast/veryfast) for FFmpeg WASM performance.
+ * FFmpeg WASM is ~10-20x slower than native, so we prioritize speed over compression.
+ * Quality impact is minimal - mainly affects file size, not visual quality.
  */
 export function getExportSettings(quality: 'low' | 'medium' | 'high' = 'medium'): ExportSettings {
   const presets = {
@@ -305,7 +330,7 @@ export function getExportSettings(quality: 'low' | 'medium' | 'high' = 'medium')
       audioBitrate: '128k',
       resolution: '1080x1920',
       fps: 30,
-      preset: 'medium',
+      preset: 'ultrafast',  // Changed from 'medium' for 5-10x faster encoding
       crf: 23,
     },
     high: {
@@ -315,8 +340,8 @@ export function getExportSettings(quality: 'low' | 'medium' | 'high' = 'medium')
       audioBitrate: '192k',
       resolution: '1080x1920',
       fps: 30,
-      preset: 'slow',
-      crf: 18,
+      preset: 'veryfast',  // Changed from 'slow' for faster encoding
+      crf: 20,  // Slightly adjusted for balance between quality and speed
     },
   };
 

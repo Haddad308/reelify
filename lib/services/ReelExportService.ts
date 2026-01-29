@@ -178,9 +178,32 @@ export class ReelExportService {
         return null;
       };
 
-      // Try with captions first
-      let args = buildFFmpegCommand(startTime, duration, captions, settings);
+      // Determine if we can use stream copy (no re-encoding) for faster export
+      // Stream copy is nearly instant but can only be used when no filters are needed
+      const visibleCaptions = captions.filter(c => c.isVisible);
+      const canUseStreamCopy = visibleCaptions.length === 0;
+      
+      if (canUseStreamCopy) {
+        console.log('No captions detected - using stream copy mode for faster export');
+      }
+      
+      // Try with captions first (or stream copy if no captions)
+      let args = buildFFmpegCommand(startTime, duration, captions, settings, 'input.mp4', 'output.mp4', canUseStreamCopy);
       let uint8Data = await executeAndCheck(args);
+      
+      // If stream copy failed, fall back to re-encoding
+      if (!uint8Data && canUseStreamCopy) {
+        console.warn('Stream copy failed, falling back to re-encoding...');
+        
+        // Clean up failed output
+        try {
+          await ffmpeg.deleteFile('output.mp4');
+        } catch { /* ignore */ }
+        
+        // Retry without stream copy
+        args = buildFFmpegCommand(startTime, duration, captions, settings, 'input.mp4', 'output.mp4', false);
+        uint8Data = await executeAndCheck(args);
+      }
       
       // If failed and we had captions, try without captions as fallback
       if (!uint8Data && captions.length > 0) {
@@ -192,9 +215,19 @@ export class ReelExportService {
           await ffmpeg.deleteFile('output.mp4');
         } catch { /* ignore */ }
         
-        // Rebuild command without captions
-        args = buildFFmpegCommand(startTime, duration, [], settings);
+        // Rebuild command without captions (try stream copy first)
+        args = buildFFmpegCommand(startTime, duration, [], settings, 'input.mp4', 'output.mp4', true);
         uint8Data = await executeAndCheck(args);
+        
+        // If stream copy failed, try re-encoding without captions
+        if (!uint8Data) {
+          try {
+            await ffmpeg.deleteFile('output.mp4');
+          } catch { /* ignore */ }
+          
+          args = buildFFmpegCommand(startTime, duration, [], settings, 'input.mp4', 'output.mp4', false);
+          uint8Data = await executeAndCheck(args);
+        }
         
         if (uint8Data) {
           console.warn('Export succeeded without captions. Captions may contain unsupported characters or require font files not available in the browser.');
