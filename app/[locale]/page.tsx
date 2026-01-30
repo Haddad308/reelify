@@ -657,7 +657,7 @@ export default function HomePage() {
           <div className="flex-1" />
           <Image
             src="/Transparent white1.png"
-            alt="Realify"
+            alt="Reelify"
             width={200}
             height={100}
           />
