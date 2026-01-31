@@ -1,32 +1,35 @@
-import { NextIntlClientProvider } from 'next-intl';
-import { getMessages, setRequestLocale } from 'next-intl/server';
-import { notFound } from 'next/navigation';
-import { locales, localeDirection, type Locale } from '@/i18n/config';
+import { NextIntlClientProvider } from "next-intl";
+import { getMessages, setRequestLocale } from "next-intl/server";
+import { notFound } from "next/navigation";
+import { locales, localeDirection, type Locale } from "@/i18n/config";
 import "../globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import type { Metadata } from "next";
 
 export function generateStaticParams() {
-  return locales.map((locale) => ({ locale }));
+  return locales.map(locale => ({ locale }));
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
   const { locale } = await params;
-  
-  const isArabic = locale === 'ar';
-  
+
+  const isArabic = locale === "ar";
+
   return {
-    metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
+    metadataBase: new URL(
+      process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"
+    ),
     title: {
-<<<<<<< HEAD
-      default: isArabic ? "Reelify | Reels بالذكاء الاصطناعي" : "Reelify | AI-Powered Reels",
-      template: "%s | Relify",
-=======
-      default: isArabic ? "Reelify | ريلز عربية بالذكاء الاصطناعي" : "Reelify | AI-Powered Arabic Reels",
+      default: isArabic
+        ? "Reelify | ريلز عربية بالذكاء الاصطناعي"
+        : "Reelify | AI-Powered Arabic Reels",
       template: "%s | Reelify",
->>>>>>> d97dd79141f4a2595207a504a6f3936c3a6d5be5
     },
-    description: isArabic 
+    description: isArabic
       ? "حوّل الفيديوهات العربية الطويلة إلى ريلز قصيرة احترافية مع عناوين جذابة خلال دقائق."
       : "Convert long Arabic videos into professional short reels with engaging titles in minutes.",
     keywords: [
@@ -46,9 +49,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       follow: true,
     },
     icons: {
-      icon: [
-        { url: "/favicon.svg", type: "image/svg+xml" },
-      ],
+      icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
       shortcut: "/favicon.svg",
     },
     manifest: "/site.webmanifest",
@@ -57,23 +58,27 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       locale: isArabic ? "ar_AR" : "en_US",
       url: "/",
       siteName: "Reelify",
-      title: isArabic ? "Reelify | ريلز عربية بالذكاء الاصطناعي" : "Relify | AI-Powered Arabic Reels",
-      description: isArabic 
+      title: isArabic
+        ? "Reelify | ريلز عربية بالذكاء الاصطناعي"
+        : "Relify | AI-Powered Arabic Reels",
+      description: isArabic
         ? "حوّل الفيديوهات العربية الطويلة إلى ريلز قصيرة احترافية مع عناوين جذابة خلال دقائق."
         : "Convert long Arabic videos into professional short reels with engaging titles in minutes.",
     },
     twitter: {
       card: "summary_large_image",
-      title: isArabic ? "Reelify | ريلز عربية بالذكاء الاصطناعي" : "Relify | AI-Powered Arabic Reels",
-      description: isArabic 
+      title: isArabic
+        ? "Reelify | ريلز عربية بالذكاء الاصطناعي"
+        : "Relify | AI-Powered Arabic Reels",
+      description: isArabic
         ? "حوّل الفيديوهات العربية الطويلة إلى ريلز قصيرة احترافية مع عناوين جذابة خلال دقائق."
         : "Convert long Arabic videos into professional short reels with engaging titles in minutes.",
     },
     alternates: {
       canonical: "/",
       languages: {
-        'ar': '/ar',
-        'en': '/en',
+        ar: "/ar",
+        en: "/en",
       },
     },
   };
@@ -87,7 +92,7 @@ export default async function LocaleLayout({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  
+
   // Validate locale
   if (!locales.includes(locale as Locale)) {
     notFound();
