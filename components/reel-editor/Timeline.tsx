@@ -2,9 +2,10 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import * as Slider from '@radix-ui/react-slider';
+import { Pencil } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useReelEditorStore } from '@/lib/store/useReelEditorStore';
-import { secondsToTimecode } from '@/lib/utils/timecodeUtils';
+import { secondsToTimecode, timecodeToSeconds } from '@/lib/utils/timecodeUtils';
 import styles from './Timeline.module.css';
 
 export function Timeline() {
@@ -21,6 +22,10 @@ export function Timeline() {
   // Use ref for immediate synchronous updates
   const draggingSliderRef = useRef<'start' | 'end' | null>(null);
   const [draggingSlider, setDraggingSlider] = useState<'start' | 'end' | null>(null);
+
+  // Local state for manual timecode editing (start/end inputs)
+  const [startTimeEdit, setStartTimeEdit] = useState<string | null>(null);
+  const [endTimeEdit, setEndTimeEdit] = useState<string | null>(null);
 
   // Use trim points directly without auto-correction
   const safeTrimPoints = trimPoints;
@@ -115,6 +120,40 @@ export function Timeline() {
     const newEnd = Math.min(sourceVideoDuration, safeTrimPoints.endTime + STEP);
     updateTrimEnd(newEnd);
   };
+
+  const commitStartTimeEdit = useCallback(
+    (raw: string) => {
+      const seconds = timecodeToSeconds(raw.trim());
+      if (Number.isNaN(seconds)) {
+        setStartTimeEdit(null);
+        return;
+      }
+      const clamped = Math.max(
+        0,
+        Math.min(seconds, sourceVideoDuration, safeTrimPoints.endTime - minDuration)
+      );
+      updateTrimStart(clamped);
+      setStartTimeEdit(null);
+    },
+    [sourceVideoDuration, safeTrimPoints.endTime, updateTrimStart]
+  );
+
+  const commitEndTimeEdit = useCallback(
+    (raw: string) => {
+      const seconds = timecodeToSeconds(raw.trim());
+      if (Number.isNaN(seconds)) {
+        setEndTimeEdit(null);
+        return;
+      }
+      const clamped = Math.min(
+        sourceVideoDuration,
+        Math.max(seconds, safeTrimPoints.startTime + minDuration, 0)
+      );
+      updateTrimEnd(clamped);
+      setEndTimeEdit(null);
+    },
+    [sourceVideoDuration, safeTrimPoints.startTime, updateTrimEnd]
+  );
 
   if (sourceVideoDuration === 0) {
     return <div className={styles.container}>{t('loadingTimeline')}</div>;
@@ -255,11 +294,63 @@ export function Timeline() {
       <div className={styles.infoDisplay}>
         <div className={styles.infoItem}>
           <span className={styles.infoLabel}>{t('start')}:</span>
-          <span className={styles.infoValue}>{secondsToTimecode(safeTrimPoints.startTime)}</span>
+          {startTimeEdit !== null ? (
+            <input
+              type="text"
+              className={styles.infoValueInput}
+              value={startTimeEdit}
+              onChange={(e) => setStartTimeEdit(e.target.value)}
+              onBlur={() => commitStartTimeEdit(startTimeEdit)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitStartTimeEdit(startTimeEdit);
+                if (e.key === 'Escape') setStartTimeEdit(null);
+              }}
+              placeholder="MM:SS.mmm"
+              aria-label={t('start')}
+              autoFocus
+            />
+          ) : (
+            <button
+              type="button"
+              className={styles.infoValueEditable}
+              onClick={() => setStartTimeEdit(secondsToTimecode(safeTrimPoints.startTime))}
+              title={t('clickToEdit')}
+              aria-label={t('clickToEdit')}
+            >
+              <span className={styles.infoValueText}>{secondsToTimecode(safeTrimPoints.startTime)}</span>
+              <Pencil className={styles.infoValueIcon} aria-hidden />
+            </button>
+          )}
         </div>
         <div className={styles.infoItem}>
           <span className={styles.infoLabel}>{t('end')}:</span>
-          <span className={styles.infoValue}>{secondsToTimecode(safeTrimPoints.endTime)}</span>
+          {endTimeEdit !== null ? (
+            <input
+              type="text"
+              className={styles.infoValueInput}
+              value={endTimeEdit}
+              onChange={(e) => setEndTimeEdit(e.target.value)}
+              onBlur={() => commitEndTimeEdit(endTimeEdit)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitEndTimeEdit(endTimeEdit);
+                if (e.key === 'Escape') setEndTimeEdit(null);
+              }}
+              placeholder="MM:SS.mmm"
+              aria-label={t('end')}
+              autoFocus
+            />
+          ) : (
+            <button
+              type="button"
+              className={styles.infoValueEditable}
+              onClick={() => setEndTimeEdit(secondsToTimecode(safeTrimPoints.endTime))}
+              title={t('clickToEdit')}
+              aria-label={t('clickToEdit')}
+            >
+              <span className={styles.infoValueText}>{secondsToTimecode(safeTrimPoints.endTime)}</span>
+              <Pencil className={styles.infoValueIcon} aria-hidden />
+            </button>
+          )}
         </div>
         <div className={styles.infoItem}>
           <span className={styles.infoLabel}>{t('duration')}:</span>
