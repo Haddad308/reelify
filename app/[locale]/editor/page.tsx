@@ -64,9 +64,10 @@ function EditorContent() {
   const videoUrlParam = searchParams.get("videoUrl");
   const startTimeParam = searchParams.get("startTime");
   const endTimeParam = searchParams.get("endTime");
-  const title = searchParams.get("title") || t('defaultTitle');
+  const titleInitial = searchParams.get("title") || t('defaultTitle');
   const category = searchParams.get("category") || t('defaultCategory');
   const transcript = searchParams.get("transcript") || "";
+  const [editedTitle, setEditedTitle] = useState(titleInitial);
   const [videoUrl, setVideoUrl] = useState<string | null>(videoUrlParam);
   const [videoDuration, setVideoDuration] = useState<number>(0);
   const [isLoadingDuration, setIsLoadingDuration] = useState(true);
@@ -250,7 +251,7 @@ function EditorContent() {
       endTime,
       transcription: segments.length > 0 ? { segments } : undefined,
       metadata: {
-        title,
+        title: editedTitle,
         description: transcript,
       },
     };
@@ -259,7 +260,7 @@ function EditorContent() {
     startTimeParam,
     endTimeParam,
     transcript,
-    title,
+    editedTitle,
     videoDuration,
   ]);
 
@@ -329,7 +330,7 @@ function EditorContent() {
   const handleExportSuccess = (result: ReelExportResult) => {
     const a = document.createElement("a");
     a.href = result.videoUrl;
-    a.download = `${title || "reel"}-edited.mp4`;
+    a.download = `${editedTitle || "reel"}-edited.mp4`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -351,9 +352,24 @@ function EditorContent() {
               alt="Reelify logo"
               className="h-8 w-auto"
             />
-            <div className="flex flex-col">
-              <h1 className="text-sm font-semibold text-foreground">{title}</h1>
-              <p className="text-xs text-muted-foreground">
+            <div className="flex flex-col min-w-0 flex-1 w-full">
+              <label title={t('titleEditHint')} className="group flex items-center gap-2 sm:gap-3 rounded-lg md:rounded-xl border border-transparent bg-muted/30 px-3 py-3 sm:px-4 sm:py-4 md:px-5 md:py-4 transition-colors hover:border-border hover:bg-muted/50 focus-within:border-primary/50 focus-within:bg-muted/50 focus-within:ring-2 focus-within:ring-primary/20 cursor-text min-h-[2.75rem] sm:min-h-[3.25rem] md:min-h-[3.5rem]">
+                <input
+                  type="text"
+                  value={editedTitle}
+                  onChange={(e) => setEditedTitle(e.target.value)}
+                  className="flex-1 min-w-0 text-base sm:text-lg font-semibold text-foreground bg-transparent border-none outline-none placeholder:text-muted-foreground py-0.5"
+                  placeholder={t('defaultTitle')}
+                  aria-label={t('titleLabel')}
+                />
+                <span className="flex shrink-0 text-muted-foreground transition-colors group-hover:text-foreground group-focus-within:text-primary w-4 h-4 sm:w-5 sm:h-5" aria-hidden>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                    <path d="m15 5 4 4" />
+                  </svg>
+                </span>
+              </label>
+              <p className="mt-1 text-xs text-muted-foreground">
                 {category} • {Math.round(clipData.endTime - clipData.startTime)}{" "}
                 {locale === 'ar' ? 'ثانية' : 'seconds'}
               </p>

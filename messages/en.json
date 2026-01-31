@@ -147,6 +147,8 @@
     "loadingEditor": "Loading editor...",
     "transcription": "Transcription",
     "defaultTitle": "Video clip",
+    "titleLabel": "Edit title",
+    "titleEditHint": "Click to edit title",
     "defaultCategory": "General"
   },
   "preview": {
@@ -184,7 +186,8 @@
     "startBefore": "Move start 1 second earlier",
     "startAfter": "Move start 1 second later",
     "endBefore": "Move end 1 second earlier",
-    "endAfter": "Move end 1 second later"
+    "endAfter": "Move end 1 second later",
+    "clickToEdit": "Click to edit time (e.g. 01:30.500)"
   },
   "transcriptionEditor": {
     "fullTranscription": "Full Transcription",

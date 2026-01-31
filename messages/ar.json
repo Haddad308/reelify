@@ -147,6 +147,8 @@
     "loadingEditor": "Loading editor...",
     "transcription": "Transcription",
     "defaultTitle": "مقطع فيديو",
+    "titleLabel": "تعديل العنوان",
+    "titleEditHint": "انقر لتعديل العنوان",
     "defaultCategory": "عام"
   },
   "preview": {
@@ -184,7 +186,8 @@
     "startBefore": "بداية المقطع قبل ثانية",
     "startAfter": "بداية المقطع بعد ثانية",
     "endBefore": "نهاية المقطع قبل ثانية",
-    "endAfter": "نهاية المقطع بعد ثانية"
+    "endAfter": "نهاية المقطع بعد ثانية",
+    "clickToEdit": "انقر لتعديل الوقت (مثال: 01:30.500)"
   },
   "transcriptionEditor": {
     "fullTranscription": "Full Transcription",
