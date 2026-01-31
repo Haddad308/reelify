@@ -18,8 +18,8 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   return {
     metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
     title: {
-      default: isArabic ? "Realify | ريلز عربية بالذكاء الاصطناعي" : "Realify | AI-Powered Arabic Reels",
-      template: "%s | Realify",
+      default: isArabic ? "Reelify | Reels بالذكاء الاصطناعي" : "Reelify | AI-Powered Reels",
+      template: "%s | Relify",
     },
     description: isArabic 
       ? "حوّل الفيديوهات العربية الطويلة إلى ريلز قصيرة احترافية مع عناوين جذابة خلال دقائق."
@@ -51,15 +51,15 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       type: "website",
       locale: isArabic ? "ar_AR" : "en_US",
       url: "/",
-      siteName: "Realify",
-      title: isArabic ? "Realify | ريلز عربية بالذكاء الاصطناعي" : "Realify | AI-Powered Arabic Reels",
+      siteName: "Reelify",
+      title: isArabic ? "Reelify | ريلز عربية بالذكاء الاصطناعي" : "Relify | AI-Powered Arabic Reels",
       description: isArabic 
         ? "حوّل الفيديوهات العربية الطويلة إلى ريلز قصيرة احترافية مع عناوين جذابة خلال دقائق."
         : "Convert long Arabic videos into professional short reels with engaging titles in minutes.",
     },
     twitter: {
       card: "summary_large_image",
-      title: isArabic ? "Realify | ريلز عربية بالذكاء الاصطناعي" : "Realify | AI-Powered Arabic Reels",
+      title: isArabic ? "Reelify | ريلز عربية بالذكاء الاصطناعي" : "Relify | AI-Powered Arabic Reels",
       description: isArabic 
         ? "حوّل الفيديوهات العربية الطويلة إلى ريلز قصيرة احترافية مع عناوين جذابة خلال دقائق."
         : "Convert long Arabic videos into professional short reels with engaging titles in minutes.",

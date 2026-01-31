@@ -654,10 +654,15 @@ export default function HomePage() {
     <main className="min-h-screen bg-gradient-warm">
       <section className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-6 pb-24 pt-10">
         <div className="flex items-center justify-between">
-          <div className="flex-1" />
+          <div className="flex-1 flex items-center justify-start">
+            <span className="badge-closed-beta inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold tracking-widest uppercase">
+              <span className="badge-closed-beta-dot h-1.5 w-1.5 rounded-full bg-white/90" />
+              {tCommon('closedBeta')}
+            </span>
+          </div>
           <Image
             src="/Transparent white1.png"
-            alt="Realify"
+            alt="Reelify"
             width={200}
             height={100}
           />
@@ -667,8 +672,8 @@ export default function HomePage() {
         </div>
 
         {/* Header */}
-        <header className="text-center space-y-5 animate-fade-in mt-4">
-          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-foreground leading-tight inline-block">
+        <header className="text-center space-y-4 animate-fade-in mt-4">
+          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-foreground leading-tight">
             {t('title')}
           </h1>
           <p className="text-lg text-muted-foreground max-w-lg mx-auto leading-relaxed">

@@ -281,6 +281,54 @@
     );
   }
 
+  /* Closed Beta badge */
+  @keyframes badge-glow-pulse {
+    0%, 100% {
+      box-shadow:
+        0 2px 8px -2px rgba(255, 107, 122, 0.45),
+        0 0 0 1px rgba(255, 255, 255, 0.12) inset;
+    }
+    50% {
+      box-shadow:
+        0 2px 16px 0 rgba(255, 107, 122, 0.55),
+        0 0 0 1px rgba(255, 255, 255, 0.18) inset;
+    }
+  }
+
+  @keyframes badge-dot-pulse {
+    0%, 100% {
+      opacity: 1;
+      transform: scale(1);
+      box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.6);
+    }
+    50% {
+      opacity: 0.85;
+      transform: scale(1.15);
+      box-shadow: 0 0 0 4px rgba(255, 255, 255, 0);
+    }
+  }
+
+  .badge-closed-beta {
+    background: linear-gradient(
+      135deg,
+      hsl(354 100% 71%) 0%,
+      hsl(354 100% 66%) 50%,
+      hsl(354 75% 58%) 100%
+    );
+    color: hsl(0 0% 100%);
+    animation: badge-glow-pulse 2.5s ease-in-out infinite;
+    transition: transform 0.2s ease;
+  }
+
+  .badge-closed-beta:hover {
+    animation-duration: 1.8s;
+  }
+
+  .badge-closed-beta-dot {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
+    animation: badge-dot-pulse 2s ease-in-out infinite;
+  }
+
   /* Smile / curved accent element */
   .smile-accent {
     position: relative;

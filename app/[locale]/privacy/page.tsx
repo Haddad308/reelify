@@ -20,7 +20,7 @@ export default function PrivacyPage() {
           <Link href={`/${locale}`}>
             <Image
               src="/Transparent white1.png"
-              alt="Realify"
+              alt="Reelify"
               width={160}
               height={80}
               className="cursor-pointer hover:opacity-80 transition-opacity"
