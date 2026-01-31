@@ -17,6 +17,19 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import Image from "next/image";
+import {
+  Youtube,
+  Instagram,
+  Facebook,
+  Linkedin,
+  Music,
+  Camera,
+  Timer,
+  Users,
+  Sparkles,
+  HelpCircle,
+  type LucideIcon,
+} from "lucide-react";
 
 type ClipItem = {
   title: string;
@@ -617,6 +630,43 @@ export default function HomePage() {
     5: t('questions.hookStyle'),
   };
 
+  const platformIcons: Record<PlatformKey, LucideIcon> = {
+    instagram: Instagram,
+    youtube: Youtube,
+    facebook: Facebook,
+    linkedin: Linkedin,
+    tiktok: Music,
+    snapchat: Camera,
+  };
+
+  const platformIconColors: Record<PlatformKey, string> = {
+    instagram: "text-pink-500",
+    youtube: "text-red-600",
+    facebook: "text-blue-600",
+    linkedin: "text-[#0A66C2]",
+    tiktok: "text-black",
+    snapchat: "text-yellow-500",
+  };
+
+  const stepIcons: Record<number, LucideIcon> = {
+    1: platformIcons[platform],
+    2: Timer,
+    3: Users,
+    4: Sparkles,
+    5: HelpCircle,
+  };
+
+  const stepIconColors: Record<number, string> = {
+    1: platformIconColors[platform],
+    2: "text-foreground",
+    3: "text-foreground",
+    4: "text-foreground",
+    5: "text-foreground",
+  };
+
+  const QuestionIcon = stepIcons[step];
+  const questionIconColor = stepIconColors[step];
+
   const platformOptions = [
     { value: "instagram" as PlatformKey, label: t('platforms.instagram'), color: "text-pink-500" },
     { value: "tiktok" as PlatformKey, label: t('platforms.tiktok'), color: "text-black" },
@@ -951,48 +1001,53 @@ export default function HomePage() {
                   {/* Step 1: Platform */}
                   {step === 1 && (
                     <div className="grid gap-4 animate-fade-in">
-                      {platformOptions.map((option, index) => (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => {
-                            setPlatform(option.value);
-                            const recommendedDuration =
-                              recommendedDurationMap[option.value] ??
-                              preferredDuration;
-                            setPreferredDuration(recommendedDuration);
-                            void persistPreferences({
-                              platform: option.value,
-                              preferredDuration: recommendedDuration,
-                            });
-                          }}
-                          className={`flex items-center gap-5 p-5 rounded-2xl border-2 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${
-                            platform === option.value
-                              ? "border-primary bg-primary/10 shadow-teal"
-                              : "border-transparent bg-muted/50 hover:bg-muted hover:border-primary/20"
-                          }`}
-                          style={{ animationDelay: `${index * 0.1}s` }}
-                        >
-                          <span className="font-semibold text-lg">
-                            {option.label}
-                          </span>
-                          {platform === option.value && (
-                            <svg
-                              className="w-6 h-6 text-primary ms-auto"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M5 13l4 4L19 7"
-                              />
-                            </svg>
-                          )}
-                        </button>
-                      ))}
+                      {platformOptions.map((option, index) => {
+                        const PlatformOptionIcon = platformIcons[option.value];
+                        const iconColor = platformIconColors[option.value];
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => {
+                              setPlatform(option.value);
+                              const recommendedDuration =
+                                recommendedDurationMap[option.value] ??
+                                preferredDuration;
+                              setPreferredDuration(recommendedDuration);
+                              void persistPreferences({
+                                platform: option.value,
+                                preferredDuration: recommendedDuration,
+                              });
+                            }}
+                            className={`flex items-center gap-5 p-5 rounded-2xl border-2 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${
+                              platform === option.value
+                                ? "border-primary bg-primary/10 shadow-teal"
+                                : "border-transparent bg-muted/50 hover:bg-muted hover:border-primary/20"
+                            }`}
+                            style={{ animationDelay: `${index * 0.1}s` }}
+                          >
+                            <PlatformOptionIcon className={`h-6 w-6 shrink-0 ${iconColor}`} aria-hidden />
+                            <span className="font-semibold text-lg">
+                              {option.label}
+                            </span>
+                            {platform === option.value && (
+                              <svg
+                                className="w-6 h-6 text-primary ms-auto"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M5 13l4 4L19 7"
+                                />
+                              </svg>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
 
