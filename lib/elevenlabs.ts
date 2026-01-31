@@ -75,26 +75,28 @@ export async function transcribeAudioFromBuffer(
   }
 
   const fileSizeMB = (audioBuffer.length / 1024 / 1024).toFixed(2);
-  
+
   // Use scribe_v2 for faster transcription (newer and faster than scribe_v1)
   // Available models: scribe_v1, scribe_v1_experimental, scribe_v2
   const modelId = process.env.ELEVENLABS_STT_MODEL || "scribe_v2";
   console.log(`[ElevenLabs] Using model: ${modelId}`);
-  
+
   // Create FormData compatible with fetch API
   // Convert Buffer to Uint8Array then to Blob for FormData
   // Buffer is a subclass of Uint8Array, but we need to ensure compatibility
   const uint8Array = Uint8Array.from(audioBuffer);
-  const audioBlob = new Blob([uint8Array], { type: "audio/mpeg" });
+  const audioBlob = new Blob([uint8Array], { type: "audio/ogg" });
   const formData = new FormData();
-  
+
   formData.append("model_id", modelId);
   formData.append("timestamps_granularity", "word");
-  formData.append("file", audioBlob, "audio.mp3");
+  formData.append("file", audioBlob, "audio.opus");
 
   const requestStart = Date.now();
-  console.log(`[ElevenLabs] Starting transcription request from buffer (${fileSizeMB}MB)`);
-  
+  console.log(
+    `[ElevenLabs] Starting transcription request from buffer (${fileSizeMB}MB)`,
+  );
+
   const response = await fetch(API_URL, {
     method: "POST",
     headers: {
@@ -102,9 +104,11 @@ export async function transcribeAudioFromBuffer(
     },
     body: formData,
   });
-  
+
   const requestTime = Date.now() - requestStart;
-  console.log(`[ElevenLabs] Transcription request completed in ${requestTime}ms`);
+  console.log(
+    `[ElevenLabs] Transcription request completed in ${requestTime}ms`,
+  );
 
   if (!response.ok) {
     const details = await response.text();

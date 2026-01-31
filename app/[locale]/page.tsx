@@ -11,7 +11,14 @@ import {
   cleanupInputFile,
   extractThumbnail,
 } from "@/lib/ffmpegWasm";
-import { storeVideoFile, storeThumbnails, getThumbnailBlobUrl, storeAudioFile, getAudioFile, clearAllStorage } from "@/lib/videoStorage";
+import {
+  storeVideoFile,
+  storeThumbnails,
+  getThumbnailBlobUrl,
+  storeAudioFile,
+  getAudioFile,
+  clearAllStorage,
+} from "@/lib/videoStorage";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -49,16 +56,22 @@ type TranscriptSegment = {
   text: string;
 };
 
-type PlatformKey = 'instagram' | 'tiktok' | 'youtube' | 'snapchat' | 'facebook' | 'linkedin';
+type PlatformKey =
+  | "instagram"
+  | "tiktok"
+  | "youtube"
+  | "snapchat"
+  | "facebook"
+  | "linkedin";
 
 export default function HomePage() {
   const router = useRouter();
   const locale = useLocale();
-  const t = useTranslations('home');
-  const tLoading = useTranslations('loading');
-  const tResults = useTranslations('results');
-  const tCommon = useTranslations('common');
-  
+  const t = useTranslations("home");
+  const tLoading = useTranslations("loading");
+  const tResults = useTranslations("results");
+  const tCommon = useTranslations("common");
+
   const [file, setFile] = useState<File | null>(null);
   const [videoBlobUrl, setVideoBlobUrl] = useState<string | null>(null);
   const [clips, setClips] = useState<ClipItem[]>([]);
@@ -80,10 +93,10 @@ export default function HomePage() {
   const [hookStyle, setHookStyle] = useState("");
   const [hookStyleSkipped, setHookStyleSkipped] = useState(false);
   const [skipQuestions, setSkipQuestions] = useState(false);
-  
+
   // Set default values based on locale
   useEffect(() => {
-    if (locale === 'ar') {
+    if (locale === "ar") {
       if (!audience) setAudience("شباب 18-30");
       if (!tone) setTone("ملهم");
       if (!hookStyle) setHookStyle("سؤال مباشر");
@@ -103,8 +116,9 @@ export default function HomePage() {
     linkedin: 45,
   };
 
-  const [currentRecommendationIndex, setCurrentRecommendationIndex] = useState<number>(0);
-  
+  const [currentRecommendationIndex, setCurrentRecommendationIndex] =
+    useState<number>(0);
+
   // Get recommendations for current platform from translations
   const currentRecommendations = useMemo(() => {
     const recs = t.raw(`platformRecommendations.${platform}`) as string[];
@@ -118,6 +132,9 @@ export default function HomePage() {
   } | null>(null);
   const [backgroundError, setBackgroundError] = useState<string>("");
   const [backgroundProcessing, setBackgroundProcessing] = useState(false);
+  const [thumbnailGenerating, setThumbnailGenerating] = useState<Set<number>>(
+    new Set(),
+  );
 
   const backgroundResultRef = useRef(backgroundResult);
   const backgroundErrorRef = useRef(backgroundError);
@@ -140,9 +157,11 @@ export default function HomePage() {
     if (screen === "loading") {
       if (currentRecommendations.length > 1) {
         const interval = setInterval(() => {
-          setCurrentRecommendationIndex((prev) => (prev + 1) % currentRecommendations.length);
+          setCurrentRecommendationIndex(
+            (prev) => (prev + 1) % currentRecommendations.length,
+          );
         }, 4000);
-        
+
         return () => clearInterval(interval);
       }
     } else {
@@ -154,28 +173,35 @@ export default function HomePage() {
   useEffect(() => {
     if (typeof globalThis.window === "undefined") return;
 
-    const navEntry = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
-    const isRefresh = navEntry?.type === 'reload';
+    const navEntry = performance.getEntriesByType("navigation")[0] as
+      | PerformanceNavigationTiming
+      | undefined;
+    const isRefresh = navEntry?.type === "reload";
 
     if (isRefresh) {
-      const hasActiveSession = globalThis.sessionStorage.getItem("reelify_clips") !== null;
+      const hasActiveSession =
+        globalThis.sessionStorage.getItem("reelify_clips") !== null;
       if (hasActiveSession) {
-        console.log('[IndexedDB] Page refreshed but active session exists, preserving storage...');
+        console.log(
+          "[IndexedDB] Page refreshed but active session exists, preserving storage...",
+        );
       } else {
-        console.log('[IndexedDB] Page refreshed with no active session, clearing storage...');
+        console.log(
+          "[IndexedDB] Page refreshed with no active session, clearing storage...",
+        );
         void clearAllStorage();
       }
     }
 
     const handleBeforeUnload = () => {
-      console.log('[IndexedDB] Page closing, clearing storage...');
+      console.log("[IndexedDB] Page closing, clearing storage...");
       void clearAllStorage();
     };
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener("beforeunload", handleBeforeUnload);
 
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, []);
 
@@ -197,12 +223,13 @@ export default function HomePage() {
         try {
           const parsedClips = JSON.parse(storedClips);
           if (Array.isArray(parsedClips) && parsedClips.length > 0) {
-            const storedSegments = globalThis.sessionStorage.getItem(
-              "reelify_segments",
-            );
+            const storedSegments =
+              globalThis.sessionStorage.getItem("reelify_segments");
             if (storedSegments) {
               try {
-                const parsedSegments = JSON.parse(storedSegments) as TranscriptSegment[];
+                const parsedSegments = JSON.parse(
+                  storedSegments,
+                ) as TranscriptSegment[];
                 if (Array.isArray(parsedSegments)) setSegments(parsedSegments);
               } catch {
                 // Ignore invalid segments
@@ -210,18 +237,20 @@ export default function HomePage() {
             }
             const restoreThumbnails = async () => {
               const clipsWithThumbnails = await Promise.all(
-                parsedClips.map(async (clip: ClipItem) => {
+                parsedClips.map(async (clip: ClipItem, index: number) => {
                   const clipKey = `thumb-${clip.start}-${clip.end}`;
                   const thumbnailUrl = await getThumbnailBlobUrl(clipKey);
                   if (thumbnailUrl) {
                     return { ...clip, thumbnail: thumbnailUrl };
                   }
+                  // Mark as generating if thumbnail is missing
+                  setThumbnailGenerating((prev) => new Set(prev).add(index));
                   return { ...clip, thumbnail: "" };
-                })
+                }),
               );
               setClips(clipsWithThumbnails);
             };
-            
+
             setVideoBlobUrl(storedVideoUrl);
             setScreen("results");
             void restoreThumbnails();
@@ -251,57 +280,162 @@ export default function HomePage() {
     inputName: string,
     clips: ClipItem[],
     videoFile: File | null,
+    onThumbnailGenerated?: (index: number, thumbnailUrl: string) => void,
   ): Promise<string[]> => {
     const thumbnailData: { blob: Blob; clipKey: string }[] = [];
-    
+
     try {
       await ffmpeg.readFile(inputName);
-      console.log('[Thumbnails] Input file verified in FFmpeg filesystem');
+      console.log("[Thumbnails] Input file verified in FFmpeg filesystem");
     } catch (error) {
-      console.warn('[Thumbnails] Input file not found in FFmpeg filesystem, re-writing...', error);
+      console.warn(
+        "[Thumbnails] Input file not found in FFmpeg filesystem, re-writing...",
+        error,
+      );
       if (videoFile) {
         try {
           await writeInputFile(ffmpeg, inputName, videoFile);
-          console.log('[Thumbnails] Input file re-written successfully');
+          console.log("[Thumbnails] Input file re-written successfully");
         } catch (rewriteError) {
-          console.error('[Thumbnails] Failed to re-write input file:', rewriteError);
-          throw new Error('Failed to prepare video file for thumbnail generation');
+          console.error(
+            "[Thumbnails] Failed to re-write input file:",
+            rewriteError,
+          );
+          throw new Error(
+            "Failed to prepare video file for thumbnail generation",
+          );
         }
       } else {
-        throw new Error('Video file not available for thumbnail generation');
+        throw new Error("Video file not available for thumbnail generation");
       }
     }
-    
-    const thumbnailPromises = clips.map(async (clip, index) => {
-      try {
-        const thumbName = `thumb-${crypto.randomUUID()}.jpg`;
-        const thumbBlob = await extractThumbnail(
-          ffmpeg,
-          inputName,
-          thumbName,
-          clip.start,
-        );
 
-        const clipKey = `thumb-${clip.start}-${clip.end}`;
-        const blobUrl = URL.createObjectURL(thumbBlob);
-        thumbnailData.push({ blob: thumbBlob, clipKey });
-        
-        return blobUrl;
-      } catch (error) {
-        console.error(`Failed to generate thumbnail for clip ${index}:`, error);
-        return "";
+    // Process thumbnails sequentially to avoid memory issues with large files
+    // FFmpeg WASM can run out of memory when processing multiple thumbnails in parallel
+    const blobUrls: string[] = [];
+
+    for (let index = 0; index < clips.length; index++) {
+      const clip = clips[index];
+      let retries = 0;
+      const maxRetries = 3; // Increased retries
+      let success = false;
+
+      // Mark thumbnail as generating
+      if (onThumbnailGenerated) {
+        setThumbnailGenerating((prev) => new Set(prev).add(index));
       }
-    });
 
-    const blobUrls = await Promise.all(thumbnailPromises);
-    
+      while (retries <= maxRetries && !success) {
+        try {
+          if (retries > 0) {
+            console.log(
+              `[Thumbnails] Retry ${retries}/${maxRetries} for thumbnail ${index + 1} at ${clip.start}s`,
+            );
+            // Wait longer before retrying to allow memory to be freed
+            await new Promise((resolve) => setTimeout(resolve, 2000 * retries));
+          } else {
+            console.log(
+              `[Thumbnails] Generating thumbnail ${index + 1}/${clips.length} at ${clip.start}s`,
+            );
+          }
+
+          const thumbName = `thumb-${crypto.randomUUID()}.jpg`;
+          const thumbBlob = await extractThumbnail(
+            ffmpeg,
+            inputName,
+            thumbName,
+            clip.start,
+          );
+
+          const clipKey = `thumb-${clip.start}-${clip.end}`;
+          const blobUrl = URL.createObjectURL(thumbBlob);
+          thumbnailData.push({ blob: thumbBlob, clipKey });
+          blobUrls.push(blobUrl);
+          success = true;
+
+          // Update UI immediately when thumbnail is ready
+          if (onThumbnailGenerated) {
+            onThumbnailGenerated(index, blobUrl);
+            setThumbnailGenerating((prev) => {
+              const next = new Set(prev);
+              next.delete(index);
+              return next;
+            });
+          }
+
+          // Longer delay between extractions to allow memory cleanup
+          // Increased delay helps prevent "memory access out of bounds" errors with large files
+          if (index < clips.length - 1) {
+            // Force garbage collection hint and wait longer for large files
+            if (typeof globalThis.gc === "function") {
+              globalThis.gc();
+            }
+            await new Promise((resolve) => setTimeout(resolve, 500)); // Increased from 200ms to 500ms
+          }
+        } catch (error) {
+          const isMemoryError =
+            error instanceof Error &&
+            (error.message.includes("memory") ||
+              error.message.includes("out of bounds") ||
+              error.name === "RuntimeError" ||
+              (error as any).name === "RuntimeError");
+
+          if (isMemoryError && retries < maxRetries) {
+            retries++;
+            console.warn(
+              `[Thumbnails] Memory error for thumbnail ${index + 1}, will retry...`,
+              error,
+            );
+            // Wait progressively longer before retrying
+            await new Promise((resolve) => setTimeout(resolve, 2000 * retries));
+
+            // Force garbage collection if available
+            if (typeof globalThis.gc === "function") {
+              globalThis.gc();
+            }
+          } else {
+            console.error(
+              `[Thumbnails] Failed to generate thumbnail for clip ${index} after ${retries} retries:`,
+              error,
+            );
+            blobUrls.push("");
+            success = true; // Stop retrying and move to next thumbnail
+
+            // Remove from generating set
+            if (onThumbnailGenerated) {
+              setThumbnailGenerating((prev) => {
+                const next = new Set(prev);
+                next.delete(index);
+                return next;
+              });
+            }
+
+            // If we got a memory error, wait longer before trying the next one
+            if (isMemoryError && index < clips.length - 1) {
+              console.warn(
+                "[Thumbnails] Memory error detected, waiting longer before next extraction...",
+              );
+              await new Promise((resolve) => setTimeout(resolve, 2000)); // Increased from 1000ms to 2000ms
+            }
+          }
+        }
+      }
+    }
+
     if (thumbnailData.length > 0) {
       try {
-        console.log('[Thumbnails] Storing', thumbnailData.length, 'thumbnails in IndexedDB');
+        console.log(
+          "[Thumbnails] Storing",
+          thumbnailData.length,
+          "thumbnails in IndexedDB",
+        );
         await storeThumbnails(thumbnailData);
-        console.log('[Thumbnails] Successfully stored thumbnails in IndexedDB');
+        console.log("[Thumbnails] Successfully stored thumbnails in IndexedDB");
       } catch (error) {
-        console.error('[Thumbnails] Failed to store thumbnails in IndexedDB:', error);
+        console.error(
+          "[Thumbnails] Failed to store thumbnails in IndexedDB:",
+          error,
+        );
       }
     }
 
@@ -327,44 +461,76 @@ export default function HomePage() {
     setBackgroundError("");
     setBackgroundResult(null);
     setProgress(0);
-    setStatus(tLoading('preparingVideo'));
+    setStatus(tLoading("preparingVideo"));
+
+    const fileSizeMB = videoFile.size / (1024 * 1024);
+    console.log(
+      `[Background Processing] Starting audio extraction for ${fileSizeMB.toFixed(2)}MB file`,
+    );
 
     try {
       setProgress(5);
-      setStatus(tLoading('loadingTools'));
+      setStatus(tLoading("loadingTools"));
+      const loadStart = Date.now();
       const ffmpeg = await getFfmpeg();
-      
+      console.log(
+        `[Background Processing] FFmpeg loaded in ${Date.now() - loadStart}ms`,
+      );
+
       setProgress(10);
-      setStatus(tLoading('readingFile'));
+      setStatus(tLoading("readingFile"));
+      const writeStart = Date.now();
       const inputName = `input-${Date.now()}.mp4`;
       await writeInputFile(ffmpeg, inputName, videoFile);
+      console.log(
+        `[Background Processing] Video file written to FFmpeg filesystem in ${Date.now() - writeStart}ms`,
+      );
 
       setProgress(15);
-      setStatus(tLoading('extractingAudio'));
-      const audioName = `audio-${Date.now()}.mp3`;
+      setStatus(tLoading("extractingAudio"));
+      const extractStart = Date.now();
+      const audioName = `audio-${Date.now()}.opus`;
+      console.log(`[Background Processing] Starting audio extraction...`);
       const audioBlob = await extractAudioWav(ffmpeg, inputName, audioName);
-      
+      const extractTime = Date.now() - extractStart;
+      console.log(
+        `[Background Processing] Audio extraction completed in ${(extractTime / 1000).toFixed(1)}s (${(audioBlob.size / 1024 / 1024).toFixed(2)}MB)`,
+      );
+
       setProgress(20);
 
-      const audioFile = new File([audioBlob], "audio.mp3", {
-        type: "audio/mpeg",
+      const audioFile = new File([audioBlob], "audio.opus", {
+        type: "audio/ogg",
       });
       await storeAudioFile(audioFile);
-      
+
       const audioBlobUrl = URL.createObjectURL(audioFile);
-      
+
       setBackgroundResult({
         ffmpeg,
         inputName,
         audioUrl: audioBlobUrl,
       });
+
+      console.log(
+        `[Background Processing] Background processing completed successfully`,
+      );
     } catch (err) {
-      console.error("Background processing error:", err);
-      const message =
-        err instanceof Error ? err.message : tLoading('processingError');
+      console.error(
+        "[Background Processing] Error during background processing:",
+        err,
+      );
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error("[Background Processing] Error details:", {
+        message: errorMessage,
+        fileSizeMB: fileSizeMB.toFixed(2),
+        errorType: err instanceof Error ? err.constructor.name : typeof err,
+      });
+      const message = errorMessage || tLoading("processingError");
       setBackgroundError(message);
     } finally {
       setBackgroundProcessing(false);
+      console.log(`[Background Processing] Background processing finished`);
     }
   };
 
@@ -379,7 +545,7 @@ export default function HomePage() {
     setBackgroundResult(null);
 
     if (!file) {
-      setError(t('selectVideoError'));
+      setError(t("selectVideoError"));
       return;
     }
 
@@ -412,12 +578,39 @@ export default function HomePage() {
     setIsProcessing(true);
 
     try {
+      // Calculate timeout based on file size (allow more time for larger files)
+      // For a 600MB file, audio extraction can take 5-10+ minutes
+      // Estimate: ~1 minute per 100MB, minimum 2 minutes, maximum 30 minutes
+      const fileSizeMB = file ? file.size / (1024 * 1024) : 0;
+      const estimatedMinutes = Math.max(2, Math.ceil(fileSizeMB / 100));
+      const maxWaitMinutes = Math.min(30, estimatedMinutes * 2); // Allow 2x estimated time
+      const maxAttempts = maxWaitMinutes * 60 * 10; // 10 checks per second = 100ms intervals
+
+      console.log(
+        `[Background Processing] Waiting for audio extraction (file: ${fileSizeMB.toFixed(2)}MB, max wait: ${maxWaitMinutes} minutes)`,
+      );
+
       if (backgroundProcessingRef.current) {
-        setStatus(tLoading('waitingAnalysis'));
+        setStatus(tLoading("waitingAnalysis"));
         let attempts = 0;
-        while (backgroundProcessingRef.current && attempts < 1200) {
+        while (backgroundProcessingRef.current && attempts < maxAttempts) {
           await new Promise((resolve) => setTimeout(resolve, 100));
           attempts++;
+
+          // Log progress every 30 seconds
+          if (attempts % 300 === 0) {
+            const waitedSeconds = attempts / 10;
+            console.log(
+              `[Background Processing] Still waiting... (${waitedSeconds.toFixed(0)}s elapsed)`,
+            );
+          }
+        }
+
+        // If we exited the loop but processing is still running, log a warning
+        if (backgroundProcessingRef.current) {
+          console.warn(
+            `[Background Processing] Timeout reached (${maxWaitMinutes} minutes) but processing still running`,
+          );
         }
       }
 
@@ -426,13 +619,19 @@ export default function HomePage() {
       }
 
       if (!backgroundResultRef.current) {
-        throw new Error(tLoading('videoNotReady'));
+        // Check if processing is still running - if so, provide a more helpful error
+        if (backgroundProcessingRef.current) {
+          throw new Error(
+            `Audio extraction is taking longer than expected (${maxWaitMinutes} minutes). Please wait a bit longer and try again, or try with a smaller file.`,
+          );
+        }
+        throw new Error(tLoading("videoNotReady"));
       }
 
       const { ffmpeg, inputName } = backgroundResultRef.current;
 
       if (!videoBlobUrl) {
-        throw new Error(tLoading('videoUrlMissing'));
+        throw new Error(tLoading("videoUrlMissing"));
       }
       const originalVideoUrl = videoBlobUrl;
 
@@ -445,10 +644,7 @@ export default function HomePage() {
           "reelify_video_name",
           file?.name || "video.mp4",
         );
-        globalThis.sessionStorage.setItem(
-          "reelify_platform",
-          platform,
-        );
+        globalThis.sessionStorage.setItem("reelify_platform", platform);
       }
 
       const sessionPreferences: Record<string, unknown> = {};
@@ -468,37 +664,37 @@ export default function HomePage() {
       }
 
       setProgress(20);
-      setStatus(tLoading('analyzingContent'));
-      
+      setStatus(tLoading("analyzingContent"));
+
       const audioFile = await getAudioFile();
       if (!audioFile) {
-        throw new Error(tLoading('audioNotFound'));
+        throw new Error(tLoading("audioNotFound"));
       }
-      
+
       setProgress(20);
-      
+
       const formData = new FormData();
       formData.append("audio", audioFile);
       formData.append("preferences", JSON.stringify(sessionPreferences));
-      
+
       let progressValue = 20;
       const progressInterval = setInterval(() => {
         progressValue = Math.min(progressValue + 0.3, 92);
         setProgress(Math.floor(progressValue));
       }, 300);
-      
+
       const response = await fetch("/api/process", {
         method: "POST",
         body: formData,
       });
-      
+
       clearInterval(progressInterval);
       setProgress((prev) => Math.max(prev, 85));
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const payload = await response.json();
       if (!response.ok) {
-        throw new Error(payload?.error || tLoading('analysisError'));
+        throw new Error(payload?.error || tLoading("analysisError"));
       }
 
       const candidates = Array.isArray(payload?.clips) ? payload.clips : [];
@@ -507,12 +703,12 @@ export default function HomePage() {
         : [];
 
       if (candidates.length === 0) {
-        throw new Error(tLoading('noClipsFound'));
+        throw new Error(tLoading("noClipsFound"));
       }
 
       setProgress(88);
-      setStatus(tLoading('preparingClipsShort'));
-      await new Promise(resolve => setTimeout(resolve, 100));
+      setStatus(tLoading("preparingClipsShort"));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const getClipTranscript = (start: number, end: number): string => {
         return segments
@@ -536,35 +732,75 @@ export default function HomePage() {
           duration,
           url: originalVideoUrl,
           thumbnail: "",
-          category: candidate.category || (locale === 'ar' ? "عام" : "General"),
+          category: candidate.category || (locale === "ar" ? "عام" : "General"),
           tags: Array.isArray(candidate.tags) ? candidate.tags : [],
           transcript: clipTranscript,
         });
       }
 
       setProgress(92);
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await new Promise((resolve) => setTimeout(resolve, 150));
       setClips(uploadedClips);
       setSegments(segments);
+
+      // Mark all thumbnails as generating immediately so loading state shows right away
+      setThumbnailGenerating(new Set(uploadedClips.map((_, index) => index)));
+
       setProgress(96);
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await new Promise((resolve) => setTimeout(resolve, 150));
       setStatus("");
       setProgress(100);
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 200));
       setScreen("results");
 
-      void generateThumbnailsInParallel(ffmpeg, inputName, uploadedClips, file)
+      void generateThumbnailsInParallel(
+        ffmpeg,
+        inputName,
+        uploadedClips,
+        file,
+        (index, thumbnailUrl) => {
+          // Update thumbnail immediately as it's generated
+          setClips((prevClips) => {
+            const updatedClips = prevClips.map((clip, i) => {
+              if (i === index) {
+                console.log(
+                  `[Thumbnails] Setting thumbnail for clip ${index} (${clip.start}-${clip.end})`,
+                );
+                return {
+                  ...clip,
+                  thumbnail: thumbnailUrl,
+                };
+              }
+              return clip;
+            });
+            if (typeof globalThis.window !== "undefined") {
+              globalThis.sessionStorage.setItem(
+                "reelify_clips",
+                JSON.stringify(updatedClips),
+              );
+            }
+            return updatedClips;
+          });
+        },
+      )
         .then((thumbnails) => {
-          console.log('[Thumbnails] Generated thumbnails:', thumbnails.length, 'URLs');
+          console.log(
+            "[Thumbnails] Generated thumbnails:",
+            thumbnails.length,
+            "URLs",
+          );
+          // Final update to ensure all thumbnails are set
           setClips((prevClips) => {
             const updatedClips = prevClips.map((clip, index) => {
               const thumbnailUrl = thumbnails[index] || clip.thumbnail;
-              if (thumbnailUrl) {
-                console.log(`[Thumbnails] Setting thumbnail for clip ${index} (${clip.start}-${clip.end}):`, thumbnailUrl.substring(0, 50) + '...');
+              if (thumbnailUrl && !clip.thumbnail) {
+                console.log(
+                  `[Thumbnails] Final update: Setting thumbnail for clip ${index} (${clip.start}-${clip.end})`,
+                );
               }
               return {
                 ...clip,
-                thumbnail: thumbnailUrl,
+                thumbnail: thumbnailUrl || clip.thumbnail,
               };
             });
             if (typeof globalThis.window !== "undefined") {
@@ -575,9 +811,10 @@ export default function HomePage() {
             }
             return updatedClips;
           });
+          setThumbnailGenerating(new Set()); // Clear all generating flags
         })
         .catch((error) => {
-          console.error('[Thumbnails] Error generating thumbnails:', error);
+          console.error("[Thumbnails] Error generating thumbnails:", error);
         })
         .finally(() => {
           void cleanupInputFile(ffmpeg, inputName);
@@ -596,7 +833,7 @@ export default function HomePage() {
       }
     } catch (err) {
       console.error("Processing error:", err);
-      let message = tLoading('processingFailed');
+      let message = tLoading("processingFailed");
       if (err instanceof Error) {
         message = err.message;
       } else if (typeof err === "string") {
@@ -623,11 +860,11 @@ export default function HomePage() {
   const totalSteps = 5;
 
   const questionTitles: Record<number, string> = {
-    1: t('questions.platform'),
-    2: t('questions.duration'),
-    3: t('questions.audience'),
-    4: t('questions.tone'),
-    5: t('questions.hookStyle'),
+    1: t("questions.platform"),
+    2: t("questions.duration"),
+    3: t("questions.audience"),
+    4: t("questions.tone"),
+    5: t("questions.hookStyle"),
   };
 
   const platformIcons: Record<PlatformKey, LucideIcon> = {
@@ -668,36 +905,60 @@ export default function HomePage() {
   const questionIconColor = stepIconColors[step];
 
   const platformOptions = [
-    { value: "instagram" as PlatformKey, label: t('platforms.instagram'), color: "text-pink-500" },
-    { value: "tiktok" as PlatformKey, label: t('platforms.tiktok'), color: "text-black" },
-    { value: "youtube" as PlatformKey, label: t('platforms.youtube'), color: "text-red-600" },
-    { value: "snapchat" as PlatformKey, label: t('platforms.snapchat'), color: "text-yellow-400" },
-    { value: "facebook" as PlatformKey, label: t('platforms.facebook'), color: "text-blue-600" },
-    { value: "linkedin" as PlatformKey, label: t('platforms.linkedin'), color: "text-[#0A66C2]" },
+    {
+      value: "instagram" as PlatformKey,
+      label: t("platforms.instagram"),
+      color: "text-pink-500",
+    },
+    {
+      value: "tiktok" as PlatformKey,
+      label: t("platforms.tiktok"),
+      color: "text-black",
+    },
+    {
+      value: "youtube" as PlatformKey,
+      label: t("platforms.youtube"),
+      color: "text-red-600",
+    },
+    {
+      value: "snapchat" as PlatformKey,
+      label: t("platforms.snapchat"),
+      color: "text-yellow-400",
+    },
+    {
+      value: "facebook" as PlatformKey,
+      label: t("platforms.facebook"),
+      color: "text-blue-600",
+    },
+    {
+      value: "linkedin" as PlatformKey,
+      label: t("platforms.linkedin"),
+      color: "text-[#0A66C2]",
+    },
   ];
 
   const audienceOptions = [
-    { value: t('audiences.youth'), icon: "👥" },
-    { value: t('audiences.entrepreneurs'), icon: "💼" },
-    { value: t('audiences.selfDevelopment'), icon: "🚀" },
-    { value: t('audiences.students'), icon: "🎓" },
-    { value: t('audiences.techProfessionals'), icon: "💻" },
+    { value: t("audiences.youth"), icon: "👥" },
+    { value: t("audiences.entrepreneurs"), icon: "💼" },
+    { value: t("audiences.selfDevelopment"), icon: "🚀" },
+    { value: t("audiences.students"), icon: "🎓" },
+    { value: t("audiences.techProfessionals"), icon: "💻" },
   ];
 
   const toneOptions = [
-    { value: t('tones.inspiring'), icon: "✨" },
-    { value: t('tones.educational'), icon: "📚" },
-    { value: t('tones.energetic'), icon: "🔥" },
-    { value: t('tones.calm'), icon: "🌿" },
-    { value: t('tones.practical'), icon: "🎯" },
+    { value: t("tones.inspiring"), icon: "✨" },
+    { value: t("tones.educational"), icon: "📚" },
+    { value: t("tones.energetic"), icon: "🔥" },
+    { value: t("tones.calm"), icon: "🌿" },
+    { value: t("tones.practical"), icon: "🎯" },
   ];
 
   const hookStyleOptions = [
-    { value: t('hookStyles.directQuestion'), icon: "❓" },
-    { value: t('hookStyles.strongNumber'), icon: "📊" },
-    { value: t('hookStyles.quickPromise'), icon: "⚡" },
-    { value: t('hookStyles.shortStory'), icon: "📖" },
-    { value: t('hookStyles.warning'), icon: "⚠️" },
+    { value: t("hookStyles.directQuestion"), icon: "❓" },
+    { value: t("hookStyles.strongNumber"), icon: "📊" },
+    { value: t("hookStyles.quickPromise"), icon: "⚡" },
+    { value: t("hookStyles.shortStory"), icon: "📖" },
+    { value: t("hookStyles.warning"), icon: "⚠️" },
   ];
 
   return (
@@ -707,7 +968,7 @@ export default function HomePage() {
           <div className="flex-1 flex items-center justify-start">
             <span className="badge-closed-beta inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold tracking-widest uppercase">
               <span className="badge-closed-beta-dot h-1.5 w-1.5 rounded-full bg-white/90" />
-              {tCommon('closedBeta')}
+              {tCommon("closedBeta")}
             </span>
           </div>
           <Image
@@ -724,10 +985,10 @@ export default function HomePage() {
         {/* Header */}
         <header className="text-center space-y-4 animate-fade-in mt-4">
           <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-foreground leading-tight">
-            {t('title')}
+            {t("title")}
           </h1>
           <p className="text-lg text-muted-foreground max-w-lg mx-auto leading-relaxed">
-            {t('subtitle')}
+            {t("subtitle")}
           </p>
         </header>
 
@@ -762,11 +1023,11 @@ export default function HomePage() {
                       </div>
                       <p className="mb-2 text-base text-foreground">
                         <span className="font-semibold text-primary">
-                          {t('uploadLabel')}
+                          {t("uploadLabel")}
                         </span>
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {t('uploadFormats')}
+                        {t("uploadFormats")}
                       </p>
                     </div>
                     <input
@@ -780,10 +1041,10 @@ export default function HomePage() {
                           setFile(null);
                           return;
                         }
-                        const maxSize = 100 * 1024 * 1024;
+                        const maxSize = 1024 * 1024 * 1024;
                         if (selectedFile.size > maxSize) {
                           setFile(null);
-                          setError(t('fileTooLarge'));
+                          setError(t("fileTooLarge"));
                           return;
                         }
                         setError("");
@@ -792,7 +1053,7 @@ export default function HomePage() {
                     />
                   </label>
                   <p className="mt-2 text-xs text-muted-foreground text-center">
-                    {t('maxFileSize')}
+                    {t("maxFileSize")}
                   </p>
                   {file && (
                     <div className="mt-4 p-4 rounded-xl bg-primary/5 border border-primary/20 animate-fade-in-scale">
@@ -810,7 +1071,7 @@ export default function HomePage() {
                             d="M5 13l4 4L19 7"
                           />
                         </svg>
-                        {t('fileSelected', { filename: file.name })}
+                        {t("fileSelected", { filename: file.name })}
                       </p>
                     </div>
                   )}
@@ -821,7 +1082,7 @@ export default function HomePage() {
                   size="lg"
                   className="w-full max-w-sm text-white h-14 text-lg font-semibold bg-gradient-teal hover:shadow-teal hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 rounded-xl"
                 >
-                  {tCommon('continue')}
+                  {tCommon("continue")}
                 </Button>
                 {error && (
                   <p className="text-sm text-destructive animate-fade-in">
@@ -841,7 +1102,7 @@ export default function HomePage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground font-medium">
-                    {t('questionOf', { current: step, total: totalSteps })}
+                    {t("questionOf", { current: step, total: totalSteps })}
                   </span>
                   <span className="font-semibold text-primary text-lg">
                     {Math.round((step / totalSteps) * 100)}%
@@ -860,7 +1121,7 @@ export default function HomePage() {
                 <div className="flex items-center justify-center gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20 animate-fade-in">
                   <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                   <span className="text-sm font-medium text-primary">
-                    {t('analyzingInBackground')}
+                    {t("analyzingInBackground")}
                   </span>
                 </div>
               )}
@@ -879,7 +1140,7 @@ export default function HomePage() {
                     htmlFor="skip-questions"
                     className="text-sm font-medium text-foreground"
                   >
-                    {t('skipQuestionsLabel')}
+                    {t("skipQuestionsLabel")}
                   </label>
                 </div>
                 {skipQuestions && (
@@ -889,7 +1150,7 @@ export default function HomePage() {
                     onClick={handleSkipQuestions}
                     className="bg-gradient-teal text-white hover:shadow-teal hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
                   >
-                    {t('startWithoutQuestions')}
+                    {t("startWithoutQuestions")}
                   </Button>
                 )}
               </div>
@@ -912,7 +1173,7 @@ export default function HomePage() {
                     </svg>
                   </div>
                   <span className="text-sm font-medium text-emerald-700">
-                    {t('readyToConvert')}
+                    {t("readyToConvert")}
                   </span>
                 </div>
               )}
@@ -951,12 +1212,12 @@ export default function HomePage() {
                         <>
                           {audienceSkipped && (
                             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-600 border border-red-200">
-                              {t('questionSkipped')}
+                              {t("questionSkipped")}
                             </span>
                           )}
                           {!audienceSkipped && audience.trim() && (
                             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              {t('questionAnswered')}
+                              {t("questionAnswered")}
                             </span>
                           )}
                         </>
@@ -965,12 +1226,12 @@ export default function HomePage() {
                         <>
                           {toneSkipped && (
                             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-600 border border-red-200">
-                              {t('questionSkipped')}
+                              {t("questionSkipped")}
                             </span>
                           )}
                           {!toneSkipped && tone.trim() && (
                             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              {t('questionAnswered')}
+                              {t("questionAnswered")}
                             </span>
                           )}
                         </>
@@ -979,12 +1240,12 @@ export default function HomePage() {
                         <>
                           {hookStyleSkipped && (
                             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-600 border border-red-200">
-                              {t('questionSkipped')}
+                              {t("questionSkipped")}
                             </span>
                           )}
                           {!hookStyleSkipped && hookStyle.trim() && (
                             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              {t('questionAnswered')}
+                              {t("questionAnswered")}
                             </span>
                           )}
                         </>
@@ -1026,7 +1287,10 @@ export default function HomePage() {
                             }`}
                             style={{ animationDelay: `${index * 0.1}s` }}
                           >
-                            <PlatformOptionIcon className={`h-6 w-6 shrink-0 ${iconColor}`} aria-hidden />
+                            <PlatformOptionIcon
+                              className={`h-6 w-6 shrink-0 ${iconColor}`}
+                              aria-hidden
+                            />
                             <span className="font-semibold text-lg">
                               {option.label}
                             </span>
@@ -1055,9 +1319,11 @@ export default function HomePage() {
                   {step === 2 && (
                     <div className="space-y-4 animate-fade-in">
                       <p className="text-sm text-muted-foreground text-center">
-                        {t('durationRecommendation', {
-                          duration: recommendedDurationMap[platform] ?? preferredDuration,
-                          platform: t(`platforms.${platform}`)
+                        {t("durationRecommendation", {
+                          duration:
+                            recommendedDurationMap[platform] ??
+                            preferredDuration,
+                          platform: t(`platforms.${platform}`),
                         })}
                       </p>
                       <div className="grid grid-cols-3 gap-4">
@@ -1082,7 +1348,7 @@ export default function HomePage() {
                               {duration}
                             </span>
                             <span className="block text-sm text-muted-foreground mt-1">
-                              {tCommon('seconds')}
+                              {tCommon("seconds")}
                             </span>
                           </button>
                         ))}
@@ -1132,7 +1398,7 @@ export default function HomePage() {
                       ))}
                       <div className="mt-4 space-y-3">
                         <label className="block text-sm font-medium text-foreground">
-                          {t('audienceCustomLabel')}
+                          {t("audienceCustomLabel")}
                         </label>
                         <input
                           type="text"
@@ -1147,14 +1413,14 @@ export default function HomePage() {
                               void persistPreferences({ audience: trimmed });
                             }
                           }}
-                          placeholder={t('audienceCustomPlaceholder')}
+                          placeholder={t("audienceCustomPlaceholder")}
                           className="w-full rounded-xl border border-border bg-background/80 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
                         />
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
                           <span>
                             {audienceSkipped
-                              ? t('questionSkipped')
-                              : t('audienceCustomHint')}
+                              ? t("questionSkipped")
+                              : t("audienceCustomHint")}
                           </span>
                           <button
                             type="button"
@@ -1167,7 +1433,7 @@ export default function HomePage() {
                             }}
                             className="text-primary hover:underline font-medium"
                           >
-                            {t('skipQuestion')}
+                            {t("skipQuestion")}
                           </button>
                         </div>
                       </div>
@@ -1216,7 +1482,7 @@ export default function HomePage() {
                       ))}
                       <div className="mt-4 space-y-3">
                         <label className="block text-sm font-medium text-foreground">
-                          {t('toneCustomLabel')}
+                          {t("toneCustomLabel")}
                         </label>
                         <input
                           type="text"
@@ -1231,14 +1497,14 @@ export default function HomePage() {
                               void persistPreferences({ tone: trimmed });
                             }
                           }}
-                          placeholder={t('toneCustomPlaceholder')}
+                          placeholder={t("toneCustomPlaceholder")}
                           className="w-full rounded-xl border border-border bg-background/80 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
                         />
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
                           <span>
                             {toneSkipped
-                              ? t('questionSkipped')
-                              : t('toneCustomHint')}
+                              ? t("questionSkipped")
+                              : t("toneCustomHint")}
                           </span>
                           <button
                             type="button"
@@ -1251,7 +1517,7 @@ export default function HomePage() {
                             }}
                             className="text-primary hover:underline font-medium"
                           >
-                            {t('skipQuestion')}
+                            {t("skipQuestion")}
                           </button>
                         </div>
                       </div>
@@ -1302,7 +1568,7 @@ export default function HomePage() {
                       ))}
                       <div className="mt-4 space-y-3">
                         <label className="block text-sm font-medium text-foreground">
-                          {t('hookStyleCustomLabel')}
+                          {t("hookStyleCustomLabel")}
                         </label>
                         <input
                           type="text"
@@ -1317,14 +1583,14 @@ export default function HomePage() {
                               void persistPreferences({ hookStyle: trimmed });
                             }
                           }}
-                          placeholder={t('hookStyleCustomPlaceholder')}
+                          placeholder={t("hookStyleCustomPlaceholder")}
                           className="w-full rounded-xl border border-border bg-background/80 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
                         />
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
                           <span>
                             {hookStyleSkipped
-                              ? t('questionSkipped')
-                              : t('hookStyleCustomHint')}
+                              ? t("questionSkipped")
+                              : t("hookStyleCustomHint")}
                           </span>
                           <button
                             type="button"
@@ -1341,7 +1607,7 @@ export default function HomePage() {
                             }}
                             className="text-primary hover:underline font-medium"
                           >
-                            {t('skipQuestion')}
+                            {t("skipQuestion")}
                           </button>
                         </div>
                       </div>
@@ -1360,7 +1626,7 @@ export default function HomePage() {
                       disabled={step === 1}
                       className={`text-base px-6 ${step === 1 ? "invisible" : "hover:bg-muted"}`}
                     >
-                      {t('previous')}
+                      {t("previous")}
                     </Button>
                     {step < totalSteps ? (
                       <Button
@@ -1373,7 +1639,7 @@ export default function HomePage() {
                         }
                         className="text-base px-8 text-white bg-gradient-teal hover:shadow-teal hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
                       >
-                        {t('next')}
+                        {t("next")}
                       </Button>
                     ) : (
                       <Button
@@ -1383,7 +1649,7 @@ export default function HomePage() {
                         disabled={isProcessing}
                         className="text-base text-white px-8 bg-gradient-coral hover:shadow-warm hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
                       >
-                        {isProcessing ? t('converting') : t('startConversion')}
+                        {isProcessing ? t("converting") : t("startConversion")}
                       </Button>
                     )}
                   </div>
@@ -1421,10 +1687,10 @@ export default function HomePage() {
                 </div>
                 <div className="space-y-3">
                   <h2 className="text-2xl font-bold text-foreground">
-                    {tLoading('preparingClips')}
+                    {tLoading("preparingClips")}
                   </h2>
                   <p className="text-lg text-muted-foreground">
-                    {status || tLoading('pleaseWait')}
+                    {status || tLoading("pleaseWait")}
                   </p>
                   {currentRecommendations.length > 0 && (
                     <div className="mt-6 p-5 bg-primary/5 rounded-xl border border-primary/20 shadow-sm">
@@ -1432,9 +1698,11 @@ export default function HomePage() {
                         <div className="text-2xl">💡</div>
                         <div className="flex-1">
                           <p className="text-sm font-semibold text-primary mb-2">
-                            {tLoading('tipsFor', { platform: t(`platforms.${platform}`) })}
+                            {tLoading("tipsFor", {
+                              platform: t(`platforms.${platform}`),
+                            })}
                           </p>
-                          <p 
+                          <p
                             key={currentRecommendationIndex}
                             className="text-sm text-muted-foreground leading-relaxed animate-fade-in"
                           >
@@ -1442,16 +1710,18 @@ export default function HomePage() {
                           </p>
                           {currentRecommendations.length > 1 && (
                             <div className="flex gap-1.5 mt-3 justify-center">
-                              {currentRecommendations.map((rec: string, index: number) => (
-                                <div
-                                  key={`rec-${platform}-${index}-${rec.substring(0, 10)}`}
-                                  className={`h-1.5 rounded-full transition-all duration-300 ${
-                                    index === currentRecommendationIndex
-                                      ? "w-6 bg-primary"
-                                      : "w-1.5 bg-primary/30"
-                                  }`}
-                                />
-                              ))}
+                              {currentRecommendations.map(
+                                (rec: string, index: number) => (
+                                  <div
+                                    key={`rec-${platform}-${index}-${rec.substring(0, 10)}`}
+                                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                                      index === currentRecommendationIndex
+                                        ? "w-6 bg-primary"
+                                        : "w-1.5 bg-primary/30"
+                                    }`}
+                                  />
+                                ),
+                              )}
                             </div>
                           )}
                         </div>
@@ -1517,21 +1787,23 @@ export default function HomePage() {
                 </svg>
               </div>
               <h2 className="text-3xl font-bold text-foreground">
-                {tResults('clipsReady')}
+                {tResults("clipsReady")}
               </h2>
               <p className="text-lg text-muted-foreground">
-                {tResults('selectClip')}
+                {tResults("selectClip")}
               </p>
             </div>
             {clips.length === 0 ? (
               <p className="text-base text-muted-foreground text-center">
-                {tResults('noClipsYet')}
+                {tResults("noClipsYet")}
               </p>
             ) : (
               <div className="grid gap-8 grid-cols-2 lg:grid-cols-3">
                 {clips.map((clip, index) => {
                   const previewParams: Record<string, string> = {
-                    ...(clip.url && !clip.url.startsWith('blob:') ? { url: clip.url } : {}),
+                    ...(clip.url && !clip.url.startsWith("blob:")
+                      ? { url: clip.url }
+                      : {}),
                     startTime: String(clip.start),
                     endTime: String(clip.end),
                     title: clip.title,
@@ -1540,10 +1812,36 @@ export default function HomePage() {
                     category: clip.category,
                     tags: clip.tags.join(","),
                     transcript: clip.transcript,
-                    ...(segments.length > 0 ? { fullTranscript: "1" } : {}),
                   };
                   const previewUrl = `/${locale}/preview?${new URLSearchParams(previewParams).toString()}`;
                   const wrapperClass = `aspect-[9/16] relative overflow-hidden cursor-pointer bg-gradient-to-br from-primary/10 to-primary/5`;
+
+                  const handlePreviewClick = (e: React.MouseEvent) => {
+                    e.preventDefault();
+                    // Store segments in BOTH sessionStorage (current tab) and localStorage (cross-tab)
+                    if (segments.length > 0) {
+                      try {
+                        const segmentsJson = JSON.stringify(segments);
+                        globalThis.sessionStorage.setItem(
+                          "reelify_segments",
+                          segmentsJson,
+                        );
+                        globalThis.localStorage.setItem(
+                          "reelify_segments",
+                          segmentsJson,
+                        );
+                        console.log(
+                          "[Results] Saved segments to storage before navigation:",
+                          segments.length,
+                        );
+                      } catch (err) {
+                        console.warn("[Results] Failed to save segments:", err);
+                      }
+                    }
+                    // Open in new tab
+                    window.open(previewUrl, "_blank", "noopener,noreferrer");
+                  };
+
                   return (
                     <Card
                       key={`${clip.start}-${clip.end}-${index}`}
@@ -1552,10 +1850,9 @@ export default function HomePage() {
                     >
                       <a
                         href={previewUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        onClick={handlePreviewClick}
                         className={`${wrapperClass} block`}
-                        aria-label={`${tResults('previewAndEdit')}: ${clip.title}`}
+                        aria-label={`${tResults("previewAndEdit")}: ${clip.title}`}
                       >
                         {clip.thumbnail ? (
                           <img
@@ -1565,17 +1862,30 @@ export default function HomePage() {
                             onError={(e) => {
                               const loadThumbnail = async () => {
                                 const clipKey = `thumb-${clip.start}-${clip.end}`;
-                                const thumbnailUrl = await getThumbnailBlobUrl(clipKey);
+                                const thumbnailUrl =
+                                  await getThumbnailBlobUrl(clipKey);
                                 if (thumbnailUrl) {
-                                  (e.target as HTMLImageElement).src = thumbnailUrl;
+                                  (e.target as HTMLImageElement).src =
+                                    thumbnailUrl;
                                 }
                               };
                               void loadThumbnail();
                             }}
                           />
                         ) : (
-                          <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/5 animate-pulse">
-                            <div className="w-full h-full bg-gradient-to-br from-gray-200 via-gray-100 to-gray-200 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800"></div>
+                          <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/5 relative overflow-hidden">
+                            <div className="w-full h-full bg-gradient-to-br from-gray-200 via-gray-100 to-gray-200 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800 animate-pulse"></div>
+                            {/* Always show loading indicator when thumbnail is empty */}
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                              <div className="flex flex-col items-center gap-2">
+                                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                                <span className="text-xs text-muted-foreground">
+                                  {thumbnailGenerating.has(index)
+                                    ? "Generating..."
+                                    : "Loading..."}
+                                </span>
+                              </div>
+                            </div>
                           </div>
                         )}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -1591,10 +1901,10 @@ export default function HomePage() {
                           </div>
                         </div>
                         <div className="absolute bottom-3 start-3 px-2.5 py-1 rounded-lg bg-black/70 text-white text-xs font-medium backdrop-blur-sm">
-                          {Math.round(clip.duration)} {tCommon('seconds')}
+                          {Math.round(clip.duration)} {tCommon("seconds")}
                         </div>
                         <div className="absolute top-3 end-3 px-2.5 py-1 rounded-lg bg-primary/90 text-white text-xs font-bold backdrop-blur-sm">
-                          {tResults('rank', { rank: index + 1 })}
+                          {tResults("rank", { rank: index + 1 })}
                         </div>
                       </a>
                       <CardContent className="p-5 space-y-4">
@@ -1634,7 +1944,7 @@ export default function HomePage() {
                                 d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
                               />
                             </svg>
-                            {tResults('previewAndEdit')}
+                            {tResults("previewAndEdit")}
                           </a>
                         </Button>
                       </CardContent>
@@ -1649,12 +1959,18 @@ export default function HomePage() {
         {/* Footer */}
         <footer className="mt-12 pt-8 border-t border-border/30 animate-fade-in">
           <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground">
-            <Link href={`/${locale}/privacy`} className="hover:text-primary transition-colors">
-              {tCommon('privacyPolicy')}
+            <Link
+              href={`/${locale}/privacy`}
+              className="hover:text-primary transition-colors"
+            >
+              {tCommon("privacyPolicy")}
             </Link>
             <span>•</span>
-            <Link href={`/${locale}/terms`} className="hover:text-primary transition-colors">
-              {tCommon('termsAndConditions')}
+            <Link
+              href={`/${locale}/terms`}
+              className="hover:text-primary transition-colors"
+            >
+              {tCommon("termsAndConditions")}
             </Link>
           </div>
         </footer>

@@ -12,8 +12,9 @@ import { getVideoBlobUrl } from "@/lib/videoStorage";
 function EditorContent() {
   const searchParams = useSearchParams();
   const locale = useLocale();
-  const t = useTranslations('editor');
-  
+  const t = useTranslations("editor");
+  const tCommon = useTranslations("common");
+
   // Check synchronously if we need to restore URL
   const needsUrlRestore = useMemo(() => {
     if (typeof window === "undefined") return false;
@@ -27,15 +28,15 @@ function EditorContent() {
 
   useEffect(() => {
     if (!needsUrlRestore) return;
-    
+
     const authSuccess = searchParams.get("auth_success");
     const savedReturnUrl = sessionStorage.getItem("auth_return_url");
-    
+
     if (authSuccess && savedReturnUrl) {
       console.log("[Editor] Restoring URL from sessionStorage after OAuth");
       setIsRestoringUrl(true);
       sessionStorage.removeItem("auth_return_url");
-      
+
       try {
         const returnUrl = new URL(savedReturnUrl);
         returnUrl.searchParams.set("auth_success", authSuccess);
@@ -55,7 +56,9 @@ function EditorContent() {
           <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
             <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
-          <p className="text-lg text-muted-foreground">{t('restoringSession')}</p>
+          <p className="text-lg text-muted-foreground">
+            {t("restoringSession")}
+          </p>
         </div>
       </div>
     );
@@ -64,8 +67,8 @@ function EditorContent() {
   const videoUrlParam = searchParams.get("videoUrl");
   const startTimeParam = searchParams.get("startTime");
   const endTimeParam = searchParams.get("endTime");
-  const titleInitial = searchParams.get("title") || t('defaultTitle');
-  const category = searchParams.get("category") || t('defaultCategory');
+  const titleInitial = searchParams.get("title") || t("defaultTitle");
+  const category = searchParams.get("category") || t("defaultCategory");
   const transcript = searchParams.get("transcript") || "";
   const [editedTitle, setEditedTitle] = useState(titleInitial);
   const [videoUrl, setVideoUrl] = useState<string | null>(videoUrlParam);
@@ -74,8 +77,9 @@ function EditorContent() {
 
   useEffect(() => {
     const validateAndLoadVideo = async () => {
-      const shouldUseIndexedDB = !videoUrlParam || videoUrlParam.startsWith('blob:');
-      
+      const shouldUseIndexedDB =
+        !videoUrlParam || videoUrlParam.startsWith("blob:");
+
       if (shouldUseIndexedDB) {
         const newBlobUrl = await getVideoBlobUrl();
         if (newBlobUrl) {
@@ -83,12 +87,12 @@ function EditorContent() {
           const video = document.createElement("video");
           video.preload = "metadata";
           video.src = newBlobUrl;
-          
+
           video.onloadedmetadata = () => {
             setVideoDuration(video.duration);
             setIsLoadingDuration(false);
           };
-          
+
           video.onerror = () => {
             setIsLoadingDuration(false);
             if (endTimeParam) {
@@ -96,7 +100,7 @@ function EditorContent() {
               setVideoDuration(Math.max(endTime + 10, 60));
             }
           };
-          
+
           video.load();
         } else {
           setIsLoadingDuration(false);
@@ -110,12 +114,12 @@ function EditorContent() {
         const video = document.createElement("video");
         video.preload = "metadata";
         video.src = videoUrlParam;
-        
+
         video.onloadedmetadata = () => {
           setVideoDuration(video.duration);
           setIsLoadingDuration(false);
         };
-        
+
         video.onerror = async () => {
           const newBlobUrl = await getVideoBlobUrl();
           if (newBlobUrl) {
@@ -123,12 +127,12 @@ function EditorContent() {
             const fallbackVideo = document.createElement("video");
             fallbackVideo.preload = "metadata";
             fallbackVideo.src = newBlobUrl;
-            
+
             fallbackVideo.onloadedmetadata = () => {
               setVideoDuration(fallbackVideo.duration);
               setIsLoadingDuration(false);
             };
-            
+
             fallbackVideo.onerror = () => {
               setIsLoadingDuration(false);
               if (endTimeParam) {
@@ -136,7 +140,7 @@ function EditorContent() {
                 setVideoDuration(Math.max(endTime + 10, 60));
               }
             };
-            
+
             fallbackVideo.load();
           } else {
             setIsLoadingDuration(false);
@@ -146,7 +150,7 @@ function EditorContent() {
             }
           }
         };
-        
+
         video.load();
       }
     };
@@ -187,10 +191,25 @@ function EditorContent() {
       ? Number.parseFloat(endTimeParam)
       : Math.max(videoDuration, 60);
 
-    let segments: Array<{ text: string; start: number; end: number; language: "ar" | "en" }> = [];
+    let segments: Array<{
+      text: string;
+      start: number;
+      end: number;
+      language: "ar" | "en";
+    }> = [];
+
+    // Load segments from localStorage/sessionStorage (no longer using URL params to avoid 431 error)
     if (typeof window !== "undefined") {
       try {
-        const raw = window.sessionStorage.getItem("reelify_segments");
+        let raw = window.sessionStorage.getItem("reelify_segments");
+        let source = "sessionStorage";
+
+        // Fallback to localStorage (for cross-tab navigation)
+        if (!raw) {
+          raw = window.localStorage.getItem("reelify_segments");
+          source = "localStorage";
+        }
+
         if (raw) {
           const data = JSON.parse(raw) as unknown;
           if (
@@ -202,26 +221,40 @@ function EditorContent() {
                 s !== null &&
                 "start" in s &&
                 "end" in s &&
-                "text" in s
+                "text" in s,
             )
           ) {
-            segments = (data as Array<{ start: number; end: number; text: string; language?: "ar" | "en" }>).map(
-              (seg) => ({
-                text: String(seg.text).trim(),
-                start: Number(seg.start),
-                end: Number(seg.end),
-                language:
-                  seg.language === "ar" || seg.language === "en"
-                    ? seg.language
-                    : /[\u0600-\u06FF]/.test(String(seg.text))
-                      ? ("ar" as const)
-                      : ("en" as const),
-              })
+            segments = (
+              data as Array<{
+                start: number;
+                end: number;
+                text: string;
+                language?: "ar" | "en";
+              }>
+            ).map((seg) => ({
+              text: String(seg.text).trim(),
+              start: Number(seg.start),
+              end: Number(seg.end),
+              language:
+                seg.language === "ar" || seg.language === "en"
+                  ? seg.language
+                  : /[\u0600-\u06FF]/.test(String(seg.text))
+                    ? ("ar" as const)
+                    : ("en" as const),
+            }));
+            console.log(
+              `[Editor] Loaded segments from ${source}:`,
+              segments.length,
             );
+
+            // Ensure both storages have the data
+            if (source === "localStorage") {
+              window.sessionStorage.setItem("reelify_segments", raw);
+            }
           }
         }
-      } catch {
-        // Ignore invalid sessionStorage data
+      } catch (e) {
+        console.warn("[Editor] Failed to load segments from storage:", e);
       }
     }
 
@@ -292,7 +325,7 @@ function EditorContent() {
               </svg>
             </div>
             <p className="text-lg font-medium text-foreground">
-              {t('videoUrlMissing')}
+              {t("videoUrlMissing")}
             </p>
             <Button
               className="bg-gradient-teal hover:shadow-teal transition-all duration-200"
@@ -306,7 +339,7 @@ function EditorContent() {
                 globalThis.history.back();
               }}
             >
-              {t('back')}
+              {tCommon("back")}
             </Button>
           </CardContent>
         </Card>
@@ -321,7 +354,7 @@ function EditorContent() {
           <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
             <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
-          <p className="text-lg text-muted-foreground">{t('loadingVideo')}</p>
+          <p className="text-lg text-muted-foreground">{t("loadingVideo")}</p>
         </div>
       </div>
     );
@@ -353,17 +386,33 @@ function EditorContent() {
               className="h-8 w-auto shrink-0"
             />
             <div className="flex flex-col min-w-[12rem] sm:min-w-[18rem] md:min-w-[24rem] flex-1 w-full">
-              <label title={t('titleEditHint')} className="group flex items-center gap-2 sm:gap-3 rounded-lg md:rounded-xl border border-transparent bg-muted/30 px-3 py-3 sm:px-4 sm:py-4 md:px-5 md:py-4 transition-colors hover:border-border hover:bg-muted/50 focus-within:border-primary/50 focus-within:bg-muted/50 focus-within:ring-2 focus-within:ring-primary/20 cursor-text min-h-[2.75rem] sm:min-h-[3.25rem] md:min-h-[3.5rem]">
+              <label
+                title={t("titleEditHint")}
+                className="group flex items-center gap-2 sm:gap-3 rounded-lg md:rounded-xl border border-transparent bg-muted/30 px-3 py-3 sm:px-4 sm:py-4 md:px-5 md:py-4 transition-colors hover:border-border hover:bg-muted/50 focus-within:border-primary/50 focus-within:bg-muted/50 focus-within:ring-2 focus-within:ring-primary/20 cursor-text min-h-[2.75rem] sm:min-h-[3.25rem] md:min-h-[3.5rem]"
+              >
                 <input
                   type="text"
                   value={editedTitle}
                   onChange={(e) => setEditedTitle(e.target.value)}
                   className="flex-1 min-w-[8rem] w-full text-base sm:text-lg font-semibold text-foreground bg-transparent border-none outline-none placeholder:text-muted-foreground py-0.5"
-                  placeholder={t('defaultTitle')}
-                  aria-label={t('titleLabel')}
+                  placeholder={t("defaultTitle")}
+                  aria-label={t("titleLabel")}
                 />
-                <span className="flex shrink-0 text-muted-foreground transition-colors group-hover:text-foreground group-focus-within:text-primary w-4 h-4 sm:w-5 sm:h-5" aria-hidden>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <span
+                  className="flex shrink-0 text-muted-foreground transition-colors group-hover:text-foreground group-focus-within:text-primary w-4 h-4 sm:w-5 sm:h-5"
+                  aria-hidden
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="100%"
+                    height="100%"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
                     <path d="m15 5 4 4" />
                   </svg>
@@ -371,7 +420,7 @@ function EditorContent() {
               </label>
               <p className="mt-1 text-xs text-muted-foreground">
                 {category} • {Math.round(clipData.endTime - clipData.startTime)}{" "}
-                {locale === 'ar' ? 'ثانية' : 'seconds'}
+                {tCommon("seconds")}
               </p>
             </div>
           </div>
@@ -388,7 +437,7 @@ function EditorContent() {
             variant="outline"
             className="bg-gradient-coral text-white border-none hover:shadow-teal transition-all duration-200"
           >
-            {locale === 'ar' ? 'العودة' : 'Back'}
+            {tCommon("back")}
           </Button>
         </div>
       </div>
@@ -405,8 +454,8 @@ function EditorContent() {
 }
 
 export default function EditorPage() {
-  const t = useTranslations('common');
-  
+  const t = useTranslations("common");
+
   return (
     <Suspense
       fallback={
@@ -415,7 +464,7 @@ export default function EditorPage() {
             <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
               <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
-            <p className="text-lg text-muted-foreground">{t('loading')}</p>
+            <p className="text-lg text-muted-foreground">{t("loading")}</p>
           </div>
         </div>
       }

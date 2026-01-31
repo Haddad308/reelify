@@ -2,6 +2,7 @@ import { Caption, TrimPoints } from '@/types';
 
 /**
  * Filter captions that are visible within trim region
+ * A caption is visible if it overlaps with the trim region (not just if it's completely contained)
  */
 export function filterVisibleCaptions(
   captions: Caption[],
@@ -10,7 +11,7 @@ export function filterVisibleCaptions(
   return captions.map((caption) => ({
     ...caption,
     isVisible:
-      caption.startTime >= trimPoints.startTime && caption.endTime <= trimPoints.endTime,
+      caption.startTime < trimPoints.endTime && caption.endTime > trimPoints.startTime,
   }));
 }
 

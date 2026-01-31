@@ -18,10 +18,10 @@
     "subtitle": "Upload your video and answer simple questions to create the best clips",
     "uploadLabel": "Click to upload video",
     "uploadFormats": "MP4, MOV, AVI",
-    "maxFileSize": "Maximum file size: 100MB",
+    "maxFileSize": "Maximum file size: 1GB",
     "fileSelected": "Selected: {filename}",
     "selectVideoError": "Please select a video before continuing.",
-    "fileTooLarge": "Video file is larger than 100MB. Please select a smaller file.",
+    "fileTooLarge": "Video file is larger than 1GB. Please select a smaller file.",
     "questionOf": "Question {current} of {total}",
     "questionSkipped": "This question was skipped",
     "questionAnswered": "An answer was selected for this question",
@@ -173,7 +173,11 @@
     "errorLoading": "Error loading video",
     "pause": "Pause",
     "play": "Play",
-    "replay": "Replay"
+    "replay": "Replay",
+    "errorAborted": "Video loading aborted",
+    "errorNetwork": "Network error loading video",
+    "errorDecode": "Video decode error",
+    "errorFormat": "Video format not supported"
   },
   "timeline": {
     "loadingTimeline": "Loading timeline...",
@@ -187,7 +191,8 @@
     "startAfter": "Move start 1 second later",
     "endBefore": "Move end 1 second earlier",
     "endAfter": "Move end 1 second later",
-    "clickToEdit": "Click to edit time (e.g. 01:30.500)"
+    "clickToEdit": "Click to edit time (e.g. 01:30.500)",
+    "timecodePlaceholder": "MM:SS.mmm"
   },
   "transcriptionEditor": {
     "fullTranscription": "Full Transcription",
@@ -226,7 +231,8 @@
     "animationConfirm": "Note: Caption animations are preview-only and will NOT be included in the exported video.\n\nContinue with export?",
     "exportFailed": "Export failed: {error}",
     "publishFailed": "Publishing failed: {error}",
-    "publishSuccess": "Video published successfully to {platform}!\n\nView it here: {url}"
+    "publishSuccess": "Video published successfully to {platform}!\n\nView it here: {url}",
+    "defaultReelTitle": "My Reel"
   },
   "captionCanvas": {
     "safeArea": "Safe Area",

@@ -84,9 +84,20 @@ export function Timeline() {
   const getEndPosition = () => (safeTrimPoints.endTime / sourceVideoDuration) * 100;
   const getPlayheadPosition = () => (currentPlayheadTime / sourceVideoDuration) * 100;
 
+  // Calculate trim region to span exactly between markers
+  // Start from the start marker center, end slightly before end marker center
+  // to account for marker width and prevent overflow
+  const startPos = getStartPosition();
+  const endPos = getEndPosition();
+  // Account for marker half-width (~1.5%) to end exactly at marker edge
+  const markerHalfWidthPercent = 1.5;
+  // Clamp to prevent overflow beyond track boundaries
+  const trimLeft = Math.max(0, startPos);
+  const trimRight = Math.min(100, endPos - markerHalfWidthPercent);
+  const trimWidth = Math.max(0, trimRight - trimLeft);
   const trimRegionStyle = {
-    left: `${getStartPosition()}%`,
-    width: `${getEndPosition() - getStartPosition()}%`,
+    left: `${trimLeft}%`,
+    width: `${trimWidth}%`,
   };
 
   const playheadStyle = {
@@ -203,7 +214,6 @@ export function Timeline() {
               }}
             >
               <div className={styles.markerLine} />
-              <div className={styles.markerLabel}>{t('endMarker')}</div>
             </Slider.Thumb>
           </Slider.Root>
 
@@ -228,7 +238,6 @@ export function Timeline() {
               }}
             >
               <div className={styles.markerLine} />
-              <div className={styles.markerLabel}>{t('startMarker')}</div>
             </Slider.Thumb>
           </Slider.Root>
 
@@ -305,7 +314,7 @@ export function Timeline() {
                 if (e.key === 'Enter') commitStartTimeEdit(startTimeEdit);
                 if (e.key === 'Escape') setStartTimeEdit(null);
               }}
-              placeholder="MM:SS.mmm"
+              placeholder={t('timecodePlaceholder')}
               aria-label={t('start')}
               autoFocus
             />
@@ -335,7 +344,7 @@ export function Timeline() {
                 if (e.key === 'Enter') commitEndTimeEdit(endTimeEdit);
                 if (e.key === 'Escape') setEndTimeEdit(null);
               }}
-              placeholder="MM:SS.mmm"
+              placeholder={t('timecodePlaceholder')}
               aria-label={t('end')}
               autoFocus
             />

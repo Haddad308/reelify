@@ -43,16 +43,16 @@ export function VideoPlayer({ videoUrl, className }: VideoPlayerProps) {
               let errorMessage = t('errorLoading');
               switch (videoError.code) {
                 case videoError.MEDIA_ERR_ABORTED:
-                  errorMessage = 'Video loading aborted';
+                  errorMessage = t('errorAborted');
                   break;
                 case videoError.MEDIA_ERR_NETWORK:
-                  errorMessage = 'Network error loading video';
+                  errorMessage = t('errorNetwork');
                   break;
                 case videoError.MEDIA_ERR_DECODE:
-                  errorMessage = 'Video decode error';
+                  errorMessage = t('errorDecode');
                   break;
                 case videoError.MEDIA_ERR_SRC_NOT_SUPPORTED:
-                  errorMessage = 'Video format not supported';
+                  errorMessage = t('errorFormat');
                   break;
               }
               console.error('Video error details:', errorMessage, video.error);
