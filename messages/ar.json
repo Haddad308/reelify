@@ -149,7 +149,11 @@
     "defaultTitle": "مقطع فيديو",
     "titleLabel": "تعديل العنوان",
     "titleEditHint": "انقر لتعديل العنوان",
-    "defaultCategory": "عام"
+    "defaultCategory": "عام",
+    "portrait": "عمودي",
+    "landscape": "أفقي",
+    "zoom": "تكبير",
+    "format": "التنسيق"
   },
   "preview": {
     "loadingVideo": "جاري تحميل الفيديو...",
@@ -232,7 +236,19 @@
     "exportFailed": "فشل التصدير: {error}",
     "publishFailed": "فشل النشر: {error}",
     "publishSuccess": "تم نشر الفيديو بنجاح على {platform}!\n\nشاهده هنا: {url}",
-    "defaultReelTitle": "ريل"
+    "defaultReelTitle": "ريل",
+    "exportSettings": "إعدادات التصدير",
+    "exportFormat": "تنسيق التصدير",
+    "portrait": "عمودي",
+    "landscape": "أفقي",
+    "zoom": "تكبير",
+    "smartReframing": "إعادة تأطير ذكية عمودية",
+    "smart": "ذكي",
+    "autoDetect": "كشف تلقائي",
+    "facePosition": "موضع الوجه",
+    "speaker": "المتحدث",
+    "motion": "الحركة",
+    "exportWithSettings": "تصدير بالإعدادات"
   },
   "captionCanvas": {
     "safeArea": "Safe Area",

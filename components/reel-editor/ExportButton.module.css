@@ -56,9 +56,15 @@
 }
 
 .button:disabled {
-  background: hsl(var(--muted));
+  background: linear-gradient(
+    135deg,
+    hsl(354 100% 71%) 0%,
+    hsl(354 100% 65%) 45%,
+    hsl(354 72% 56%) 100%
+  );
   cursor: not-allowed;
-  opacity: 0.6;
+  opacity: 0.8;
+  color: white;
 }
 
 @keyframes fadeIn {
@@ -288,6 +294,177 @@
   font-size: 14px;
 }
 
+/* Settings Modal */
+.settingsOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.settingsModal {
+  background: hsl(var(--card));
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  border: 1px solid hsl(var(--border));
+  max-width: 500px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: modalSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.settingsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.settingsHeader h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  font-size: 28px;
+  line-height: 1;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.closeButton:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+.settingsContent {
+  padding: 24px;
+}
+
+.settingsSection {
+  margin-bottom: 24px;
+}
+
+.settingsSection:last-child {
+  margin-bottom: 0;
+}
+
+.settingsLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+  margin-bottom: 12px;
+}
+
+.settingsLabel input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.radioGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.radioOption {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-size: 14px;
+  color: hsl(var(--foreground));
+}
+
+.radioOption:hover {
+  background: hsl(var(--muted));
+}
+
+.radioOption input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: hsl(354 100% 71%);
+}
+
+.radioOption span {
+  flex: 1;
+}
+
+.settingsFooter {
+  padding: 16px 24px;
+  border-top: 1px solid hsl(var(--border));
+  display: flex;
+  justify-content: flex-end;
+}
+
+.settingsButton {
+  padding: 10px 20px;
+  background: linear-gradient(
+    135deg,
+    hsl(354 100% 71%) 0%,
+    hsl(354 100% 65%) 45%,
+    hsl(354 72% 56%) 100%
+  );
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.settingsButton:hover {
+  background: linear-gradient(
+    135deg,
+    hsl(354 100% 65%) 0%,
+    hsl(354 100% 60%) 45%,
+    hsl(354 72% 50%) 100%
+  );
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 107, 122, 0.3);
+}
+
 /* Responsive adjustments */
 @media (max-width: 480px) {
   .button {
@@ -299,5 +476,14 @@
   .dropdownItem {
     padding: 9px 12px;
     font-size: 13px;
+  }
+
+  .settingsModal {
+    width: 95%;
+    max-height: 95vh;
+  }
+
+  .settingsContent {
+    padding: 20px;
   }
 }

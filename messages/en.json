@@ -149,7 +149,11 @@
     "defaultTitle": "Video clip",
     "titleLabel": "Edit title",
     "titleEditHint": "Click to edit title",
-    "defaultCategory": "General"
+    "defaultCategory": "General",
+    "portrait": "Portrait",
+    "landscape": "Landscape",
+    "zoom": "Zoom",
+    "format": "Format"
   },
   "preview": {
     "loadingVideo": "Loading video...",
@@ -232,7 +236,19 @@
     "exportFailed": "Export failed: {error}",
     "publishFailed": "Publishing failed: {error}",
     "publishSuccess": "Video published successfully to {platform}!\n\nView it here: {url}",
-    "defaultReelTitle": "My Reel"
+    "defaultReelTitle": "My Reel",
+    "exportSettings": "Export Settings",
+    "exportFormat": "Export Format",
+    "portrait": "Portrait",
+    "landscape": "Landscape",
+    "zoom": "Zoom",
+    "smartReframing": "Smart Vertical Reframing",
+    "smart": "Smart",
+    "autoDetect": "Auto-detect",
+    "facePosition": "Face Position",
+    "speaker": "Who's Speaking",
+    "motion": "Motion",
+    "exportWithSettings": "Export with Settings"
   },
   "captionCanvas": {
     "safeArea": "Safe Area",

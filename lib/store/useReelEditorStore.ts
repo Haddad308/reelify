@@ -32,6 +32,7 @@ interface ReelEditorState {
 
   // UI state
   showSafeAreas: boolean;
+  exportFormat: 'landscape' | 'zoom';
 
   // Actions
   setCurrentClip: (clip: ReelClipInput) => void;
@@ -53,6 +54,7 @@ interface ReelEditorState {
   setExportProgress: (progress: number) => void;
   setTranscriptionState: (state: TranscriptionState) => void;
   setShowSafeAreas: (show: boolean) => void;
+  setExportFormat: (format: 'landscape' | 'zoom') => void;
   reset: () => void;
 }
 
@@ -68,6 +70,7 @@ const initialState = {
   exportProgress: 0,
   transcriptionState: { status: "idle" as const },
   showSafeAreas: false,
+  exportFormat: 'zoom' as const,
 };
 
 export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
@@ -466,6 +469,10 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
 
   setShowSafeAreas: (show) => {
     set({ showSafeAreas: show });
+  },
+
+  setExportFormat: (format) => {
+    set({ exportFormat: format });
   },
 
   reset: () => {

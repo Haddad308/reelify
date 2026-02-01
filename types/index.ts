@@ -111,6 +111,19 @@ export interface TrimPoints {
   endTime: number;
 }
 
+export type ExportFormat = 'landscape' | 'zoom';
+export type ReframingMode = 'none' | 'face' | 'speaker' | 'motion' | 'smart';
+
+export interface ReframingOptions {
+  mode: ReframingMode;
+  enabled: boolean;
+}
+
+export interface ExportFormatOptions {
+  format: ExportFormat;
+  reframing: ReframingOptions;
+}
+
 export interface ExportSettings {
   videoCodec: string;
   audioCodec: string;
@@ -121,6 +134,7 @@ export interface ExportSettings {
   preset: string;
   crf: number;
   exportWithAnimations?: boolean; // Default: false
+  formatOptions?: ExportFormatOptions; // Format and reframing options
 }
 
 export interface SafeAreas {

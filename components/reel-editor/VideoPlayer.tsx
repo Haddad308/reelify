@@ -10,9 +10,10 @@ import styles from './VideoPlayer.module.css';
 interface VideoPlayerProps {
   videoUrl: string | null;
   className?: string;
+  format?: 'zoom' | 'landscape';
 }
 
-export function VideoPlayer({ videoUrl, className }: VideoPlayerProps) {
+export function VideoPlayer({ videoUrl, className, format = 'zoom' }: VideoPlayerProps) {
   const t = useTranslations('videoPlayer');
   const { videoRef, isReady, error, togglePlayPause, seekTo, play } = useVideoPlayer(videoUrl);
   const { isPlaying, trimPoints, currentPlayheadTime } = useReelEditorStore();
@@ -31,7 +32,7 @@ export function VideoPlayer({ videoUrl, className }: VideoPlayerProps) {
       <div className={styles.videoWrapper} id="video-player-wrapper">
         <video
           ref={videoRef}
-          className={styles.video}
+          className={`${styles.video} ${format === 'zoom' ? styles.videoZoom : styles.videoLandscape}`}
           playsInline
           preload="metadata"
           crossOrigin="anonymous"
@@ -84,12 +85,12 @@ export function VideoPlayer({ videoUrl, className }: VideoPlayerProps) {
           title={isPlaying ? t('pause') : t('play')}
         >
           {isPlaying ? (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
               <rect x="6" y="4" width="4" height="16" />
               <rect x="14" y="4" width="4" height="16" />
             </svg>
           ) : (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
               <path d="M8 5v14l11-7z" />
             </svg>
           )}
@@ -100,7 +101,7 @@ export function VideoPlayer({ videoUrl, className }: VideoPlayerProps) {
           aria-label={t('replay')}
           title={t('replay')}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
         </button>

@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl';
 import { ChevronDown } from 'lucide-react';
 import { useReelEditorStore } from '@/lib/store/useReelEditorStore';
 import { ReelExportService } from '@/lib/services/ReelExportService';
-import { ReelExportResult } from '@/types';
+import { ReelExportResult, ExportFormatOptions } from '@/types';
 import { useAuthStatus, Platform } from '@/lib/hooks/useAuthStatus';
 import styles from './ExportButton.module.css';
 
@@ -43,6 +43,7 @@ export function ExportButton({
     exportProgress,
     setIsExporting,
     setExportProgress,
+    exportFormat,
   } = useReelEditorStore();
 
   const { authStatus, isLoading: isAuthLoading, authenticate, logout } = useAuthStatus();
@@ -136,6 +137,30 @@ export function ExportButton({
 
     try {
       console.log('Export button clicked, starting export...');
+      
+      const formatOptions: ExportFormatOptions = {
+        format: exportFormat,
+        reframing: {
+          mode: 'smart',
+          enabled: true,
+        },
+      };
+      
+      // Log caption state before export
+      console.log('[ExportButton] Caption state before export:', {
+        totalCaptions: captions.length,
+        visibleCaptions: captions.filter((c) => c.isVisible).length,
+        trimRange: `${trimPoints.startTime.toFixed(2)} - ${trimPoints.endTime.toFixed(2)}`,
+        captionDetails: captions.map(c => ({
+          id: c.id,
+          text: c.text.substring(0, 30),
+          isVisible: c.isVisible,
+          startTime: c.startTime,
+          endTime: c.endTime,
+          overlapsTrim: c.startTime < trimPoints.endTime && c.endTime > trimPoints.startTime
+        }))
+      });
+      
       const result = await ReelExportService.exportVideo(
         currentClip.videoSourceUrl,
         trimPoints.startTime,
@@ -143,7 +168,8 @@ export function ExportButton({
         captions.filter((c) => c.isVisible),
         currentClip.clipId,
         quality,
-        (progress) => setExportProgress(progress)
+        (progress) => setExportProgress(progress),
+        formatOptions
       );
 
       console.log('Export successful:', result);

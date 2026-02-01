@@ -19,14 +19,12 @@ export function useCaptionRenderer(
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Filter captions that are visible within trim range AND at current time
+    // Filter captions that are visible within trim range (always show all captions in trim range)
     const visibleCaptions = captions.filter(
       (c) => 
         c.isVisible && 
         c.startTime < trimEnd && 
-        c.endTime > trimStart &&
-        currentPlayheadTime >= c.startTime && 
-        currentPlayheadTime <= c.endTime
+        c.endTime > trimStart
     );
 
     console.log('[CaptionRenderer] Rendering:', {

@@ -22,16 +22,25 @@ export class ReelCaptionRenderer {
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Render visible captions at current time
-    captions.forEach((caption) => {
-      if (
+    // Filter captions visible at current time
+    const visibleAtTime = captions.filter(
+      (caption) =>
         caption.isVisible &&
         currentTime >= caption.startTime &&
         currentTime <= caption.endTime
-      ) {
-        this.renderCaptionWithAnimation(ctx, caption, currentTime, videoWidth, videoHeight);
-      }
-    });
+    );
+
+    // If multiple captions overlap, prioritize the one that started most recently
+    // Sort by startTime descending (most recent first)
+    const sortedCaptions = visibleAtTime.sort((a, b) => b.startTime - a.startTime);
+    
+    // Render only the most recent caption if multiple overlap
+    if (sortedCaptions.length > 0) {
+      const captionToRender = sortedCaptions[0];
+      // Scale caption position to fit new dimensions
+      const scaledCaption = this.scaleCaptionPosition(captionToRender, videoWidth, videoHeight);
+      this.renderCaptionWithAnimation(ctx, scaledCaption, currentTime, videoWidth, videoHeight);
+    }
   }
 
   /**
@@ -44,15 +53,15 @@ export class ReelCaptionRenderer {
     videoWidth: number,
     videoHeight: number
   ): void {
-    // Calculate animation progress
+    // Always render captions (no time filtering)
+    // Calculate animation progress for visual effects only
     const progress = calculateAnimationProgress(caption, currentTime);
 
-    if (progress <= 0) {
-      return; // Not visible yet due to delay
-    }
+    // Use progress for animations, but always render (set to 1 if progress is 0 or negative)
+    const animationProgress = progress <= 0 ? 1 : progress;
 
     // Get animation transforms
-    const transform = getAnimationTransform(caption, progress);
+    const transform = getAnimationTransform(caption, animationProgress);
 
     // Save context state
     ctx.save();
@@ -63,7 +72,7 @@ export class ReelCaptionRenderer {
     // Handle typewriter effect separately
     let textToRender = caption.text;
     if (caption.style.animation?.type === 'typewriter') {
-      const charCount = getTypewriterCharCount(caption.text, progress);
+      const charCount = getTypewriterCharCount(caption.text, animationProgress);
       textToRender = caption.text.substring(0, charCount);
     }
 
@@ -118,10 +127,41 @@ export class ReelCaptionRenderer {
     const hasKeywords = style.keywordHighlights && style.keywordHighlights.length > 0;
 
     if (hasKeywords) {
-      this.renderCaptionWithKeywords(ctx, text, style, position);
+      this.renderCaptionWithKeywords(ctx, text, style, position, videoWidth);
     } else {
-      this.renderSimpleCaption(ctx, text, style, position);
+      this.renderSimpleCaption(ctx, text, style, position, videoWidth);
     }
+  }
+
+  /**
+   * Wrap text into multiple lines based on max width
+   */
+  private static wrapText(
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    maxWidth: number
+  ): string[] {
+    const words = text.split(' ');
+    const lines: string[] = [];
+    let currentLine = '';
+
+    for (const word of words) {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      const metrics = ctx.measureText(testLine);
+      
+      if (metrics.width > maxWidth && currentLine) {
+        lines.push(currentLine);
+        currentLine = word;
+      } else {
+        currentLine = testLine;
+      }
+    }
+    
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+
+    return lines.length > 0 ? lines : [text];
   }
 
   /**
@@ -131,7 +171,8 @@ export class ReelCaptionRenderer {
     ctx: CanvasRenderingContext2D,
     text: string,
     style: Caption['style'],
-    position: { x: number; y: number }
+    position: { x: number; y: number },
+    videoWidth?: number
   ): void {
     // Set font
     const fontStyle = style.fontStyle || 'normal';
@@ -139,13 +180,23 @@ export class ReelCaptionRenderer {
     ctx.font = `${fontStyle} ${fontWeight} ${style.fontSize}px ${style.fontFamily}`;
     ctx.textBaseline = 'middle';
 
-    // Measure text
-    const metrics = ctx.measureText(text);
-    const textWidth = metrics.width;
-    const textHeight = style.fontSize;
+    // Calculate max width for text wrapping (80% of video width with padding)
+    const padding = style.padding || { top: 0, right: 0, bottom: 0, left: 0 };
+    const maxTextWidth = videoWidth 
+      ? (videoWidth * 0.8) - padding.left - padding.right
+      : 800; // Fallback width
+
+    // Wrap text into multiple lines
+    const lines = this.wrapText(ctx, text, maxTextWidth);
+
+    // Calculate dimensions for multi-line text
+    const lineHeight = style.fontSize * 1.2; // Line spacing
+    const totalTextHeight = lines.length * lineHeight;
+    const maxLineWidth = Math.max(...lines.map(line => ctx.measureText(line).width));
+    const textWidth = maxLineWidth;
+    const textHeight = totalTextHeight;
 
     // Calculate background dimensions
-    const padding = style.padding || { top: 0, right: 0, bottom: 0, left: 0 };
     const bgWidth = textWidth + padding.left + padding.right;
     const bgHeight = textHeight + padding.top + padding.bottom;
 
@@ -160,12 +211,12 @@ export class ReelCaptionRenderer {
       bgX = position.x - bgWidth / 2;
     } else if (textAlign === 'left') {
       ctx.textAlign = 'left';
-      textX = position.x;
-      bgX = position.x - padding.left;
+      textX = position.x - bgWidth / 2 + padding.left;
+      bgX = position.x - bgWidth / 2;
     } else if (textAlign === 'right') {
       ctx.textAlign = 'right';
-      textX = position.x;
-      bgX = position.x - bgWidth + padding.right;
+      textX = position.x + bgWidth / 2 - padding.right;
+      bgX = position.x - bgWidth / 2;
     } else {
       ctx.textAlign = 'center';
       textX = position.x;
@@ -191,17 +242,25 @@ export class ReelCaptionRenderer {
       ctx.shadowBlur = style.shadow.blur;
     }
 
-    // Draw stroke if specified
-    if (style.strokeColor && style.strokeWidth) {
-      ctx.strokeStyle = style.strokeColor;
-      ctx.lineWidth = style.strokeWidth;
-      ctx.strokeText(text, textX, position.y);
-    }
-
-    // Draw text
+    // Draw each line of text
+    const startY = position.y - (lines.length - 1) * lineHeight / 2;
     ctx.fillStyle = style.color;
     ctx.globalAlpha = style.opacity ?? 1;
-    ctx.fillText(text, textX, position.y);
+
+    lines.forEach((line, index) => {
+      const y = startY + index * lineHeight;
+      
+      // Draw stroke if specified
+      if (style.strokeColor && style.strokeWidth) {
+        ctx.strokeStyle = style.strokeColor;
+        ctx.lineWidth = style.strokeWidth;
+        ctx.strokeText(line, textX, y);
+      }
+
+      // Draw text
+      ctx.fillText(line, textX, y);
+    });
+
     ctx.globalAlpha = 1;
 
     // Reset shadow
@@ -212,13 +271,55 @@ export class ReelCaptionRenderer {
   }
 
   /**
+   * Wrap segments into multiple lines based on max width
+   */
+  private static wrapSegments(
+    ctx: CanvasRenderingContext2D,
+    segments: Array<{ text: string; isKeyword: boolean; fontWeight?: string }>,
+    maxWidth: number,
+    fontStyle: string,
+    fontWeight: string,
+    fontSize: number,
+    fontFamily: string
+  ): Array<Array<{ text: string; isKeyword: boolean; fontWeight?: string }>> {
+    const lines: Array<Array<{ text: string; isKeyword: boolean; fontWeight?: string }>> = [];
+    let currentLine: Array<{ text: string; isKeyword: boolean; fontWeight?: string }> = [];
+    let currentLineWidth = 0;
+
+    for (const segment of segments) {
+      const segFont = segment.isKeyword && segment.fontWeight
+        ? `${fontStyle} ${segment.fontWeight} ${fontSize}px ${fontFamily}`
+        : `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
+      ctx.font = segFont;
+      const segmentWidth = ctx.measureText(segment.text).width;
+
+      // Check if adding this segment would exceed max width
+      if (currentLineWidth + segmentWidth > maxWidth && currentLine.length > 0) {
+        lines.push(currentLine);
+        currentLine = [segment];
+        currentLineWidth = segmentWidth;
+      } else {
+        currentLine.push(segment);
+        currentLineWidth += segmentWidth;
+      }
+    }
+
+    if (currentLine.length > 0) {
+      lines.push(currentLine);
+    }
+
+    return lines.length > 0 ? lines : [segments];
+  }
+
+  /**
    * Render caption with keyword highlighting
    */
   private static renderCaptionWithKeywords(
     ctx: CanvasRenderingContext2D,
     text: string,
     style: Caption['style'],
-    position: { x: number; y: number }
+    position: { x: number; y: number },
+    videoWidth?: number
   ): void {
     // Parse text into segments
     const segments = this.parseTextSegments(text, style.keywordHighlights!);
@@ -229,35 +330,59 @@ export class ReelCaptionRenderer {
     ctx.font = `${fontStyle} ${fontWeight} ${style.fontSize}px ${style.fontFamily}`;
     ctx.textBaseline = 'middle';
 
-    // Calculate total width for alignment
-    const totalWidth = segments.reduce((sum, seg) => {
-      const segFont = seg.isKeyword && seg.fontWeight
-        ? `${fontStyle} ${seg.fontWeight} ${style.fontSize}px ${style.fontFamily}`
-        : ctx.font;
-      ctx.font = segFont;
-      return sum + ctx.measureText(seg.text).width;
-    }, 0);
+    // Calculate max width for text wrapping (80% of video width with padding)
+    const padding = style.padding || { top: 0, right: 0, bottom: 0, left: 0 };
+    const maxTextWidth = videoWidth 
+      ? (videoWidth * 0.8) - padding.left - padding.right
+      : 800; // Fallback width
 
-    // Reset font
-    ctx.font = `${fontStyle} ${fontWeight} ${style.fontSize}px ${style.fontFamily}`;
+    // Wrap segments into multiple lines
+    const wrappedLines = this.wrapSegments(
+      ctx,
+      segments,
+      maxTextWidth,
+      fontStyle,
+      fontWeight,
+      style.fontSize,
+      style.fontFamily
+    );
+
+    // Calculate total dimensions
+    const lineHeight = style.fontSize * 1.2;
+    const totalTextHeight = wrappedLines.length * lineHeight;
+    
+    // Find max line width
+    let maxLineWidth = 0;
+    wrappedLines.forEach(line => {
+      let lineWidth = 0;
+      line.forEach(seg => {
+        const segFont = seg.isKeyword && seg.fontWeight
+          ? `${fontStyle} ${seg.fontWeight} ${style.fontSize}px ${style.fontFamily}`
+          : ctx.font;
+        ctx.font = segFont;
+        lineWidth += ctx.measureText(seg.text).width;
+      });
+      maxLineWidth = Math.max(maxLineWidth, lineWidth);
+    });
+
+    const bgWidth = maxLineWidth + padding.left + padding.right;
+    const bgHeight = totalTextHeight + padding.top + padding.bottom;
 
     // Calculate starting X position based on alignment
     const textAlign = style.textAlign || 'center';
-    let currentX = position.x;
+    let baseX = position.x;
 
     if (textAlign === 'center') {
-      currentX = position.x - totalWidth / 2;
+      baseX = position.x;
     } else if (textAlign === 'right') {
-      currentX = position.x - totalWidth;
+      baseX = position.x + maxLineWidth / 2 - padding.right;
+    } else {
+      baseX = position.x - maxLineWidth / 2 + padding.left;
     }
 
-    // Draw background for entire text
-    const padding = style.padding || { top: 0, right: 0, bottom: 0, left: 0 };
-    const bgWidth = totalWidth + padding.left + padding.right;
-    const bgHeight = style.fontSize + padding.top + padding.bottom;
-
+    // Draw background for entire text block
     if (style.backgroundColor && style.backgroundColor !== 'transparent') {
-      const bgX = currentX - padding.left;
+      const bgX = position.x - bgWidth / 2;
       ctx.fillStyle = style.backgroundColor;
       ctx.fillRect(bgX, position.y - bgHeight / 2, bgWidth, bgHeight);
     }
@@ -270,37 +395,64 @@ export class ReelCaptionRenderer {
       ctx.shadowBlur = style.shadow.blur;
     }
 
-    // Render each segment
-    ctx.textAlign = 'left';
-    segments.forEach((segment) => {
-      // Set segment-specific styling
-      const segFont = segment.isKeyword && segment.fontWeight
-        ? `${fontStyle} ${segment.fontWeight} ${style.fontSize}px ${style.fontFamily}`
-        : `${fontStyle} ${fontWeight} ${style.fontSize}px ${style.fontFamily}`;
-      ctx.font = segFont;
+    // Render each line
+    const startY = position.y - (wrappedLines.length - 1) * lineHeight / 2;
+    
+    wrappedLines.forEach((line, lineIndex) => {
+      const lineY = startY + lineIndex * lineHeight;
+      
+      // Calculate line width for alignment
+      let lineWidth = 0;
+      line.forEach(seg => {
+        const segFont = seg.isKeyword && seg.fontWeight
+          ? `${fontStyle} ${seg.fontWeight} ${style.fontSize}px ${style.fontFamily}`
+          : `${fontStyle} ${fontWeight} ${style.fontSize}px ${style.fontFamily}`;
+        ctx.font = segFont;
+        lineWidth += ctx.measureText(seg.text).width;
+      });
 
-      const segWidth = ctx.measureText(segment.text).width;
-      const color = segment.isKeyword && segment.color ? segment.color : style.color;
-
-      // Draw keyword background if specified
-      if (segment.isKeyword && segment.backgroundColor) {
-        ctx.fillStyle = segment.backgroundColor;
-        ctx.fillRect(currentX, position.y - style.fontSize / 2, segWidth, style.fontSize);
+      // Calculate starting X for this line based on alignment
+      let currentX = position.x;
+      if (textAlign === 'center') {
+        currentX = position.x - lineWidth / 2;
+      } else if (textAlign === 'right') {
+        currentX = position.x - lineWidth;
+      } else {
+        currentX = position.x - maxLineWidth / 2 + padding.left;
       }
 
-      // Draw stroke
-      if (style.strokeColor && style.strokeWidth) {
-        ctx.strokeStyle = style.strokeColor;
-        ctx.lineWidth = style.strokeWidth;
-        ctx.strokeText(segment.text, currentX, position.y);
-      }
+      // Render each segment in the line
+      ctx.textAlign = 'left';
+      line.forEach((segment) => {
+        // Set segment-specific styling
+        const segFont = segment.isKeyword && segment.fontWeight
+          ? `${fontStyle} ${segment.fontWeight} ${style.fontSize}px ${style.fontFamily}`
+          : `${fontStyle} ${fontWeight} ${style.fontSize}px ${style.fontFamily}`;
+        ctx.font = segFont;
 
-      // Draw text
-      ctx.fillStyle = color;
-      ctx.globalAlpha = style.opacity ?? 1;
-      ctx.fillText(segment.text, currentX, position.y);
+        const segWidth = ctx.measureText(segment.text).width;
+        const color = segment.isKeyword && segment.color ? segment.color : style.color;
 
-      currentX += segWidth;
+        // Draw keyword background if specified
+        if (segment.isKeyword && segment.backgroundColor) {
+          ctx.fillStyle = segment.backgroundColor;
+          ctx.fillRect(currentX, lineY - style.fontSize / 2, segWidth, style.fontSize);
+        }
+
+        // Draw stroke
+        if (style.strokeColor && style.strokeWidth) {
+          ctx.strokeStyle = style.strokeColor;
+          ctx.lineWidth = style.strokeWidth;
+          ctx.strokeText(segment.text, currentX, lineY);
+        }
+
+        // Draw text
+        ctx.fillStyle = color;
+        ctx.globalAlpha = style.opacity ?? 1;
+        ctx.fillText(segment.text, currentX, lineY);
+
+        currentX += segWidth;
+      });
     });
 
     // Reset
@@ -401,6 +553,46 @@ export class ReelCaptionRenderer {
       default:
         return text;
     }
+  }
+
+  /**
+   * Scale caption position to fit new video dimensions
+   * Uses percentage-based positioning to maintain relative position
+   */
+  static scaleCaptionPosition(
+    caption: Caption,
+    targetWidth: number,
+    targetHeight: number
+  ): Caption {
+    // Original dimensions (portrait - default)
+    const originalWidth = 1080;
+    const originalHeight = 1920;
+
+    // If dimensions match, no scaling needed
+    if (targetWidth === originalWidth && targetHeight === originalHeight) {
+      return caption;
+    }
+
+    // Convert to percentage-based positioning
+    const percentX = (caption.position.x / originalWidth) * 100;
+    const percentY = (caption.position.y / originalHeight) * 100;
+
+    // Convert back to pixel coordinates for target dimensions
+    const scaledX = (percentX / 100) * targetWidth;
+    const scaledY = (percentY / 100) * targetHeight;
+
+    // Ensure position is within bounds with some padding
+    const padding = 50; // Keep some padding from edges
+    const safeX = Math.max(padding, Math.min(scaledX, targetWidth - padding));
+    const safeY = Math.max(padding, Math.min(scaledY, targetHeight - padding));
+
+    return {
+      ...caption,
+      position: {
+        x: safeX,
+        y: safeY,
+      },
+    };
   }
 
   /**

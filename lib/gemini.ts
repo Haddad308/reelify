@@ -87,7 +87,7 @@ export async function generateClipCandidates(
   // Fix invalid model names - map to available alternatives
   if (
     !modelName ||
-    modelName === "gemini-2.5-flash" ||
+    // modelName === "gemini-2.5-flash" ||
     modelName === "gemini-pro" ||
     modelName === "gemini-1.5-flash"
   ) {
