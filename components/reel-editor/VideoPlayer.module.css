@@ -1,15 +1,29 @@
 .container {
   position: relative;
   width: 100%;
+  height: 100%;
   max-width: 100%;
+  max-height: 100%;
   background: #000000;
-  border-radius: 16px;
+  border-radius: 12px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-  height: 100%;
+  box-shadow: 0 4px 10px -2px rgba(0, 0, 0, 0.06),
+    0 18px 40px -12px rgba(0, 0, 0, 0.12);
+  animation: fadeInScale 0.5s ease-out forwards;
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .videoWrapper {
@@ -20,16 +34,24 @@
   align-items: center;
   justify-content: center;
   min-height: 0;
-  aspect-ratio: 9 / 16;
   overflow: hidden;
   background: #000;
-  border-radius: 16px 16px 0 0;
+  border-radius: 12px 12px 0 0;
   width: 100%;
+  flex-shrink: 1;
 }
 
 .video {
   width: 100%;
   height: 100%;
+  display: block;
+}
+
+.videoZoom {
+  object-fit: cover;
+}
+
+.videoLandscape {
   object-fit: contain;
 }
 
@@ -45,7 +67,7 @@
 }
 
 .error {
-  color: #ff4444;
+  color: hsl(354 100% 71%);
 }
 
 .errorUrl {
@@ -87,20 +109,20 @@
   position: relative;
   flex-shrink: 0;
   height: 56px;
-  border-radius: 0 0 16px 16px;
+  border-radius: 0 0 12px 12px;
 }
 
 .controlButton {
   display: flex !important;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
   border: none;
   background: transparent;
   color: #999;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   flex-shrink: 0;
   position: relative;
   z-index: 21;
@@ -121,19 +143,35 @@
 }
 
 .playButton {
-  width: 36px;
-  height: 36px;
-  background: #4a90e2;
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(
+    135deg,
+    hsl(354 100% 71%) 0%,
+    hsl(354 100% 65%) 45%,
+    hsl(354 72% 56%) 100%
+  );
   color: #fff;
 }
 
 .playButton:hover {
-  background: #357abd;
+  background: linear-gradient(
+    135deg,
+    hsl(354 100% 65%) 0%,
+    hsl(354 100% 60%) 45%,
+    hsl(354 72% 50%) 100%
+  );
   transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(255, 107, 122, 0.25);
 }
 
 .playButton:active {
-  background: #357abd;
+  background: linear-gradient(
+    135deg,
+    hsl(354 100% 65%) 0%,
+    hsl(354 100% 60%) 45%,
+    hsl(354 72% 50%) 100%
+  );
   transform: scale(1);
 }
 
@@ -141,7 +179,7 @@
   display: flex;
   align-items: baseline;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 500;
   color: #999;
   user-select: none;
@@ -150,18 +188,19 @@
 .currentTime {
   font-weight: 500;
   color: #999;
-  font-size: 12px;
+  font-size: 10px;
   font-variant-numeric: tabular-nums;
 }
 
 .separator {
-  margin: 0 4px;
+  margin: 0 3px;
   color: #666;
   font-weight: 400;
+  font-size: 10px;
 }
 
 .totalTime {
   color: #999;
-  font-size: 12px;
+  font-size: 10px;
   font-variant-numeric: tabular-nums;
 }

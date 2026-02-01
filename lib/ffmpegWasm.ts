@@ -31,27 +31,33 @@ async function deleteFile(ffmpeg: FFmpeg, name: string) {
   }
 }
 
-export async function extractAudioWav(ffmpeg: FFmpeg, inputName: string, outputName: string) {
-  // Use MP3 compression for smaller file size (24k bitrate, 16kHz mono)
+export async function extractAudioWav(
+  ffmpeg: FFmpeg,
+  inputName: string,
+  outputName: string,
+) {
+  // Use Opus compression for smallest file size (16k bitrate, 16kHz mono)
   await ffmpeg.exec([
     "-i",
     inputName,
     "-vn",
-    "-ac",
-    "1",
-    "-ar",
-    "16000",
-    "-acodec",
-    "libmp3lame",
-    "-b:a",
-    "24k",
-    outputName
+    "-ac", "1",
+    "-ar", "12000",
+    "-c:a", "libopus",
+    "-application", "voip",
+    "-vbr", "on",
+    "-b:a", "8k",
+    "-compression_level", "10",
+    outputName,
   ]);
   const audioData = await ffmpeg.readFile(outputName);
   await deleteFile(ffmpeg, outputName); // Free memory
-  const audioBytes = typeof audioData === "string" ? new TextEncoder().encode(audioData) : audioData;
+  const audioBytes =
+    typeof audioData === "string"
+      ? new TextEncoder().encode(audioData)
+      : audioData;
   const audioBlobPart = audioBytes as BlobPart;
-  return new Blob([audioBlobPart], { type: "audio/mpeg" });
+  return new Blob([audioBlobPart], { type: "audio/ogg" });
 }
 
 export async function clipVideoSegment(
@@ -59,7 +65,7 @@ export async function clipVideoSegment(
   inputName: string,
   outputName: string,
   start: number,
-  end: number
+  end: number,
 ) {
   const safeStart = Math.max(0, start);
   const safeEnd = Math.max(safeStart, end);
@@ -78,11 +84,14 @@ export async function clipVideoSegment(
     "copy",
     "-avoid_negative_ts",
     "make_zero",
-    outputName
+    outputName,
   ]);
   const clipData = await ffmpeg.readFile(outputName);
   await deleteFile(ffmpeg, outputName); // Free memory
-  const clipBytes = typeof clipData === "string" ? new TextEncoder().encode(clipData) : clipData;
+  const clipBytes =
+    typeof clipData === "string"
+      ? new TextEncoder().encode(clipData)
+      : clipData;
   const clipBlobPart = clipBytes as BlobPart;
   return new Blob([clipBlobPart], { type: "video/mp4" });
 }
@@ -91,10 +100,14 @@ export async function extractThumbnail(
   ffmpeg: FFmpeg,
   inputName: string,
   outputName: string,
-  timestamp: number
+  timestamp: number,
 ) {
   const safeTimestamp = Math.max(0, timestamp);
-  // Extract thumbnail quickly - CSS will handle visual cropping to 9:16
+  // Extract thumbnail efficiently with memory optimizations:
+  // - Use input seeking (-ss before -i) for faster, memory-efficient seeking
+  // - Limit to 1 frame to minimize memory usage
+  // - Use lower quality (5) for smaller file size and less memory
+  // - Scale down to 640px width to reduce memory footprint
   await ffmpeg.exec([
     "-ss",
     safeTimestamp.toFixed(3),
@@ -106,11 +119,14 @@ export async function extractThumbnail(
     "5",
     "-vf",
     "scale=640:-1",
-    outputName
+    outputName,
   ]);
   const thumbData = await ffmpeg.readFile(outputName);
-  await deleteFile(ffmpeg, outputName); // Free memory
-  const thumbBytes = typeof thumbData === "string" ? new TextEncoder().encode(thumbData) : thumbData;
+  await deleteFile(ffmpeg, outputName); // Free memory immediately
+  const thumbBytes =
+    typeof thumbData === "string"
+      ? new TextEncoder().encode(thumbData)
+      : thumbData;
   const thumbBlobPart = thumbBytes as BlobPart;
   return new Blob([thumbBlobPart], { type: "image/jpeg" });
 }

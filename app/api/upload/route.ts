@@ -13,8 +13,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       onBeforeGenerateToken: async () => {
         // You can add authentication here if needed
         return {
-          allowedContentTypes: ["audio/wav", "audio/mpeg", "video/mp4", "video/quicktime", "image/jpeg"],
-          maximumSizeInBytes: 100 * 1024 * 1024, // 100MB max
+          allowedContentTypes: ["audio/wav", "audio/mpeg", "audio/ogg", "video/mp4", "video/quicktime", "image/jpeg"],
+          maximumSizeInBytes: 1024 * 1024 * 1024, // 1GB max
           addRandomSuffix: true,
         };
       },

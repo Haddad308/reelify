@@ -1,10 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslations } from 'next-intl';
+import { ChevronDown } from 'lucide-react';
 import { useReelEditorStore } from '@/lib/store/useReelEditorStore';
 import { ReelExportService } from '@/lib/services/ReelExportService';
-import { ReelExportResult } from '@/types';
+import { ReelExportResult, ExportFormatOptions } from '@/types';
 import { useAuthStatus, Platform } from '@/lib/hooks/useAuthStatus';
 import styles from './ExportButton.module.css';
 
@@ -41,6 +43,7 @@ export function ExportButton({
     exportProgress,
     setIsExporting,
     setExportProgress,
+    exportFormat,
   } = useReelEditorStore();
 
   const { authStatus, isLoading: isAuthLoading, authenticate, logout } = useAuthStatus();
@@ -52,18 +55,61 @@ export function ExportButton({
   const [exportedResult, setExportedResult] = useState<ReelExportResult | null>(null);
   
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  // Set mounted state for portal
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Calculate dropdown position when it opens
+  useEffect(() => {
+    if (showDropdown && buttonRef.current && mounted) {
+      const updatePosition = () => {
+        if (buttonRef.current) {
+          const rect = buttonRef.current.getBoundingClientRect();
+          setDropdownPosition({
+            top: rect.bottom + 8,
+            left: rect.left,
+            width: rect.width,
+          });
+        }
+      };
+      
+      updatePosition();
+      globalThis.window.addEventListener('scroll', updatePosition, true);
+      globalThis.window.addEventListener('resize', updatePosition);
+      
+      return () => {
+        globalThis.window.removeEventListener('scroll', updatePosition, true);
+        globalThis.window.removeEventListener('resize', updatePosition);
+      };
+    } else {
+      setDropdownPosition(null);
+    }
+  }, [showDropdown, mounted]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
+    if (!showDropdown) return;
+    
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        dropdownRef.current && 
+        !dropdownRef.current.contains(target) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(target)
+      ) {
         setShowDropdown(false);
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [showDropdown]);
 
   // Auth helpers per publishable platform (user can export/publish to any platform)
   const isAuthenticatedFor = (p: typeof PUBLISHABLE_PLATFORMS[number]) =>
@@ -91,6 +137,30 @@ export function ExportButton({
 
     try {
       console.log('Export button clicked, starting export...');
+      
+      const formatOptions: ExportFormatOptions = {
+        format: exportFormat,
+        reframing: {
+          mode: 'smart',
+          enabled: true,
+        },
+      };
+      
+      // Log caption state before export
+      console.log('[ExportButton] Caption state before export:', {
+        totalCaptions: captions.length,
+        visibleCaptions: captions.filter((c) => c.isVisible).length,
+        trimRange: `${trimPoints.startTime.toFixed(2)} - ${trimPoints.endTime.toFixed(2)}`,
+        captionDetails: captions.map(c => ({
+          id: c.id,
+          text: c.text.substring(0, 30),
+          isVisible: c.isVisible,
+          startTime: c.startTime,
+          endTime: c.endTime,
+          overlapsTrim: c.startTime < trimPoints.endTime && c.endTime > trimPoints.startTime
+        }))
+      });
+      
       const result = await ReelExportService.exportVideo(
         currentClip.videoSourceUrl,
         trimPoints.startTime,
@@ -98,7 +168,8 @@ export function ExportButton({
         captions.filter((c) => c.isVisible),
         currentClip.clipId,
         quality,
-        (progress) => setExportProgress(progress)
+        (progress) => setExportProgress(progress),
+        formatOptions
       );
 
       console.log('Export successful:', result);
@@ -152,7 +223,7 @@ export function ExportButton({
     try {
       const formData = new FormData();
       formData.append('video', result.videoBlob, 'reel.mp4');
-      formData.append('title', currentClip?.metadata?.title || 'My Reel');
+      formData.append('title', currentClip?.metadata?.title || t('defaultReelTitle'));
       formData.append('description', currentClip?.metadata?.description || '');
       
       if (targetPlatform === 'youtube') {
@@ -229,9 +300,11 @@ export function ExportButton({
       
       <div className={styles.dropdownContainer}>
         <button
+          ref={buttonRef}
           onClick={() => setShowDropdown(!showDropdown)}
           disabled={!currentClip || isProcessing}
           className={styles.button}
+          aria-expanded={showDropdown}
         >
           {isProcessing ? (
             <>
@@ -241,13 +314,21 @@ export function ExportButton({
           ) : (
             <>
               {t('exportReel')}
-              <span className={styles.dropdownArrow}>▼</span>
+              <ChevronDown className={styles.dropdownArrow} />
             </>
           )}
         </button>
 
-        {showDropdown && !isProcessing && (
-          <div className={styles.dropdown}>
+        {showDropdown && !isProcessing && dropdownPosition && mounted && createPortal(
+          <div 
+            ref={dropdownRef}
+            className={styles.dropdown}
+            style={{
+              top: `${dropdownPosition.top}px`,
+              left: `${dropdownPosition.left}px`,
+              width: `${dropdownPosition.width}px`,
+            }}
+          >
             <button
               className={styles.dropdownItem}
               onClick={handleDownload}
@@ -285,7 +366,8 @@ export function ExportButton({
                 </React.Fragment>
               );
             })}
-          </div>
+          </div>,
+          typeof document !== 'undefined' ? document.body : null
         )}
       </div>
 

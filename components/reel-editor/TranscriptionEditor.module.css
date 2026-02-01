@@ -1,8 +1,10 @@
 .container {
   padding: 20px;
-  background: #1a1a1a;
-  border-radius: 8px;
+  background: hsl(var(--card));
+  border-radius: 12px;
   margin-bottom: 16px;
+  border: 1px solid hsl(var(--border));
+  animation: fadeInScale 0.5s ease-out forwards;
 }
 
 .header {
@@ -15,7 +17,7 @@
 .title {
   font-size: 18px;
   font-weight: 600;
-  color: #ffffff;
+  color: hsl(var(--foreground));
   margin: 0;
 }
 
@@ -26,19 +28,30 @@
   font-size: 14px;
   font-weight: 500;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .editButton {
-  background: #4a9eff;
-  color: #ffffff;
+  background: linear-gradient(
+    135deg,
+    hsl(354 100% 71%) 0%,
+    hsl(354 100% 65%) 45%,
+    hsl(354 72% 56%) 100%
+  );
+  color: hsl(var(--primary-foreground));
 }
 
 .editButton:hover {
-  background: #3a8eef;
+  background: linear-gradient(
+    135deg,
+    hsl(354 100% 65%) 0%,
+    hsl(354 100% 60%) 45%,
+    hsl(354 72% 50%) 100%
+  );
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 107, 122, 0.25);
 }
 
 .buttonGroup {
@@ -47,23 +60,46 @@
 }
 
 .saveButton {
-  background: #4caf50;
-  color: #ffffff;
+  background: linear-gradient(
+    135deg,
+    hsl(354 100% 71%) 0%,
+    hsl(354 100% 65%) 45%,
+    hsl(354 72% 56%) 100%
+  );
+  color: hsl(var(--primary-foreground));
 }
 
 .saveButton:hover {
-  background: #45a049;
+  background: linear-gradient(
+    135deg,
+    hsl(354 100% 65%) 0%,
+    hsl(354 100% 60%) 45%,
+    hsl(354 72% 50%) 100%
+  );
+  box-shadow: 0 4px 12px rgba(255, 107, 122, 0.25);
 }
 
 .cancelButton {
   background: transparent;
-  color: #b0b0b0;
-  border: 1px solid #404040;
+  color: hsl(var(--muted-foreground));
+  border: 1px solid hsl(var(--border));
 }
 
 .cancelButton:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #ffffff;
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--border));
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .textBoxContainer {
@@ -74,32 +110,33 @@
   width: 100%;
   min-height: 200px;
   padding: 12px;
-  background: #2a2a2a;
-  border: 2px solid #404040;
-  border-radius: 6px;
-  color: #ffffff;
+  background: hsl(var(--background));
+  border: 2px solid hsl(var(--border));
+  border-radius: 8px;
+  color: hsl(var(--foreground));
   font-size: 15px;
   line-height: 1.6;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   resize: vertical;
-  transition: border-color 0.2s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .textarea:focus {
   outline: none;
-  border-color: #4a9eff;
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.2);
 }
 
 .textarea::placeholder {
-  color: #666;
+  color: hsl(var(--muted-foreground));
 }
 
 .textDisplay {
   padding: 12px;
-  background: #2a2a2a;
-  border: 2px solid #404040;
-  border-radius: 6px;
-  color: #ffffff;
+  background: hsl(var(--background));
+  border: 2px solid hsl(var(--border));
+  border-radius: 8px;
+  color: hsl(var(--foreground));
   font-size: 15px;
   line-height: 1.6;
   min-height: 200px;
@@ -111,11 +148,11 @@
 
 .info {
   padding-top: 12px;
-  border-top: 1px solid #404040;
+  border-top: 1px solid hsl(var(--border));
 }
 
 .infoText {
   font-size: 12px;
-  color: #888;
+  color: hsl(var(--muted-foreground));
   margin: 0;
 }

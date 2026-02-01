@@ -24,7 +24,7 @@ export function ReelEditor({
   onExportError,
 }: ReelEditorProps) {
   const t = useTranslations('editor');
-  const { setCurrentClip, currentClip, transcriptionState, setTranscriptionState } = useReelEditorStore();
+  const { setCurrentClip, currentClip, transcriptionState, setTranscriptionState, exportFormat, setExportFormat } = useReelEditorStore();
   const [processedClipData, setProcessedClipData] = useState<typeof clipData | null>(null);
 
   // Initialize clip data
@@ -128,9 +128,30 @@ export function ReelEditor({
       <div className={styles.editor}>
         <div className={styles.videoSection}>
           <div className={styles.videoContainer}>
-            <div className={styles.videoPlayerWrapper}>
-              <VideoPlayer videoUrl={currentClip.videoSourceUrl} />
-              <CaptionCanvas videoWidth={1080} videoHeight={1920} />
+            <div 
+              className={styles.videoPlayerWrapper}
+              data-format={exportFormat}
+            >
+              <VideoPlayer videoUrl={currentClip.videoSourceUrl} format={exportFormat} />
+              <CaptionCanvas 
+                videoWidth={1080} 
+                videoHeight={1920}
+              />
+            </div>
+            <div className={styles.formatToggle}>
+              <button
+                className={styles.toggleSwitch}
+                onClick={() => setExportFormat(exportFormat === 'zoom' ? 'landscape' : 'zoom')}
+                role="switch"
+                aria-checked={exportFormat === 'landscape'}
+                aria-label={`${t('format')}: ${exportFormat === 'zoom' ? t('zoom') : t('landscape')}`}
+              >
+                <span className={styles.toggleTrack}>
+                  <span className={styles.toggleTextZoom}>{t('zoom')}</span>
+                  <span className={styles.toggleTextLandscape}>{t('landscape')}</span>
+                  <span className={`${styles.toggleSlider} ${exportFormat === 'landscape' ? styles.toggleSliderActive : ''}`} />
+                </span>
+              </button>
             </div>
           </div>
           <Timeline />

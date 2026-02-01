@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { transcribeAudioFromBuffer } from "../../../lib/elevenlabs";
-import { generateClipCandidates, type OutputLanguage } from "../../../lib/gemini";
+import {
+  generateClipCandidates,
+  type OutputLanguage,
+} from "../../../lib/gemini";
 import { loadPreferences, type QAPreferences } from "../../../lib/qaStore";
 
 export const runtime = "nodejs";
@@ -24,7 +27,10 @@ export async function POST(request: Request) {
     console.log(`[API] Output language: ${outputLanguage}`);
 
     if (!audioFile) {
-      return NextResponse.json({ error: "Missing audio file" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing audio file" },
+        { status: 400 },
+      );
     }
 
     // Parse preferences JSON
@@ -60,8 +66,10 @@ export async function POST(request: Request) {
     const transcriptionStart = Date.now();
     const segments = await transcribeAudioFromBuffer(audioBuffer);
     const transcriptionTime = Date.now() - transcriptionStart;
-    console.log(`[API] Transcription: ${transcriptionTime}ms (${segments.length} segments)`);
-    
+    console.log(
+      `[API] Transcription: ${transcriptionTime}ms (${segments.length} segments)`,
+    );
+
     if (segments.length === 0) {
       return NextResponse.json(
         { error: "Transcript was empty" },
@@ -72,7 +80,7 @@ export async function POST(request: Request) {
     // Get preferences (already loaded in parallel)
     const mergedPreferences = await preferencesPromise;
     console.log("[API] Preferences:", mergedPreferences);
-    
+
     const geminiStart = Date.now();
     const clipCandidates = await generateClipCandidates(
       segments,
@@ -80,8 +88,10 @@ export async function POST(request: Request) {
       outputLanguage,
     );
     const geminiTime = Date.now() - geminiStart;
-    console.log(`[API] Gemini analysis: ${geminiTime}ms (${clipCandidates.length} clips)`);
-    
+    console.log(
+      `[API] Gemini analysis: ${geminiTime}ms (${clipCandidates.length} clips)`,
+    );
+
     const totalTime = Date.now() - startTime;
     console.log(`[API] Total processing time: ${totalTime}ms`);
     if (clipCandidates.length === 0) {

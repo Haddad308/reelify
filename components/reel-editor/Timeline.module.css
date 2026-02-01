@@ -1,11 +1,14 @@
 .container {
   padding: 12px;
-  background: #fff;
-  border-radius: 8px;
-  border: 1px solid #e0e0e0;
+  background: hsl(var(--card));
+  border-radius: 12px;
+  border: 1px solid hsl(var(--border));
   flex-shrink: 0;
   overflow-x: auto;
   max-height: 200px;
+  box-shadow: 0 4px 10px -2px rgba(0, 0, 0, 0.06),
+    0 18px 40px -12px rgba(0, 0, 0, 0.12);
+  animation: fadeIn 0.6s ease-out forwards;
 }
 
 @media (min-width: 768px) {
@@ -27,8 +30,19 @@
   justify-content: space-between;
   margin-bottom: 12px;
   font-size: 11px;
-  color: #666;
+  color: hsl(var(--muted-foreground));
   font-family: 'Courier New', monospace;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .timeLabel {
@@ -43,8 +57,8 @@
 .track {
   position: relative;
   height: 50px;
-  background: #f0f0f0;
-  border-radius: 6px;
+  background: hsl(var(--muted));
+  border-radius: 8px;
   overflow: visible;
 }
 
@@ -60,19 +74,21 @@
   left: 0;
   right: 0;
   height: 100%;
-  background: linear-gradient(to right, #e0e0e0 0%, #d0d0d0 100%);
-  border-radius: 6px;
-  border: 1px solid #ccc;
+  background: linear-gradient(to right, hsl(var(--muted)) 0%, hsl(var(--muted) / 0.8) 100%);
+  border-radius: 8px;
+  border: 1px solid hsl(var(--border));
 }
 
 .trimRegion {
   position: absolute;
   top: 0;
   height: 100%;
-  background: rgba(74, 144, 226, 0.2);
-  border-radius: 6px;
+  background: rgba(255, 107, 122, 0.2);
+  border-radius: 8px;
   pointer-events: none;
   z-index: 1;
+  box-sizing: border-box;
+  /* Ensure it doesn't overflow - calculation handles boundaries */
 }
 
 /* Marker sliders - span full width */
@@ -121,16 +137,21 @@
   justify-content: center;
   width: 20px;
   height: 50px;
-  background: #4a90e2;
-  border: 2px solid #fff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  background: linear-gradient(
+    135deg,
+    hsl(354 100% 71%) 0%,
+    hsl(354 100% 65%) 45%,
+    hsl(354 72% 56%) 100%
+  );
+  border: 2px solid hsl(var(--card));
+  box-shadow: 0 2px 8px rgba(255, 107, 122, 0.3);
   cursor: ew-resize;
   z-index: 5;
   position: relative;
-  border-radius: 4px;
   transform: translateX(-50%);
   pointer-events: auto; /* Enable pointer events only on thumb */
   touch-action: none; /* Prevent touch scrolling while dragging */
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @media (min-width: 1024px) {
@@ -141,14 +162,19 @@
 }
 
 .markerThumb:hover {
-  background: #357abd;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  background: linear-gradient(
+    135deg,
+    hsl(354 100% 65%) 0%,
+    hsl(354 100% 60%) 45%,
+    hsl(354 72% 50%) 100%
+  );
+  box-shadow: 0 4px 12px rgba(255, 107, 122, 0.4);
   transform: translateX(-50%) scale(1.05);
 }
 
 .markerThumb:focus {
   outline: none;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 0 3px rgba(74, 144, 226, 0.3);
+  box-shadow: 0 4px 12px rgba(255, 107, 122, 0.4), 0 0 0 3px rgba(255, 107, 122, 0.3);
 }
 
 .markerThumb:active {
@@ -156,27 +182,21 @@
 }
 
 .startMarker {
-  border-top-left-radius: 6px;
-  border-bottom-left-radius: 6px;
-  border-right: 3px solid #fff;
+  border-radius: 6px 0 0 6px; /* Rounded left, square right */
+  border-right: 3px solid hsl(var(--card));
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .endMarker {
-  border-top-right-radius: 6px;
-  border-bottom-right-radius: 6px;
-  border-left: 3px solid #fff;
+  border-radius: 0 6px 6px 0; /* Square left, rounded right */
+  border-left: 3px solid hsl(var(--card));
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
 }
 
 .markerLine {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  width: 2px;
-  height: 100%;
-  background: #4a90e2;
-  transform: translateX(-50%);
-  pointer-events: none;
-  z-index: -1;
+  display: none; /* Hide the line inside the marker - it's redundant with the thumb itself */
 }
 
 .markerLabel {
@@ -207,9 +227,9 @@
   left: 50%;
   width: 2px;
   height: 100%;
-  background: #ff4444;
+  background: hsl(354 100% 71%);
   transform: translateX(-50%);
-  box-shadow: 0 0 4px rgba(255, 68, 68, 0.5);
+  box-shadow: 0 0 4px rgba(255, 107, 122, 0.5);
 }
 
 .playheadHead {
@@ -218,11 +238,11 @@
   left: 50%;
   width: 12px;
   height: 12px;
-  background: #ff4444;
-  border: 2px solid #fff;
+  background: hsl(354 100% 71%);
+  border: 2px solid hsl(var(--card));
   border-radius: 50%;
   transform: translateX(-50%);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 6px rgba(255, 107, 122, 0.3);
 }
 
 /* ±1s trim controls */
@@ -232,7 +252,7 @@
   gap: 16px 24px;
   padding-top: 12px;
   padding-bottom: 12px;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid hsl(var(--border));
 }
 
 .trimControlGroup {
@@ -244,7 +264,7 @@
 .trimControlLabel {
   font-size: 11px;
   font-weight: 600;
-  color: #666;
+  color: hsl(var(--muted-foreground));
   text-transform: uppercase;
   letter-spacing: 0.5px;
   min-width: 36px;
@@ -260,22 +280,23 @@
   font-size: 12px;
   font-weight: 600;
   font-family: inherit;
-  color: #333;
-  background: #f0f0f0;
-  border: 1px solid #ccc;
-  border-radius: 6px;
+  color: hsl(var(--foreground));
+  background: hsl(var(--muted));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .trimBtn:hover:not(:disabled) {
-  background: #e0e0e0;
-  border-color: #4a90e2;
-  color: #4a90e2;
+  background: hsl(var(--muted) / 0.8);
+  border-color: hsl(var(--primary));
+  color: hsl(var(--primary));
 }
 
 .trimBtn:active:not(:disabled) {
-  background: #d0d0d0;
+  background: hsl(var(--muted));
+  transform: scale(0.98);
 }
 
 .trimBtn:disabled {
@@ -289,7 +310,7 @@
   justify-content: space-between;
   gap: 16px;
   padding-top: 12px;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid hsl(var(--border));
   font-size: 12px;
 }
 
@@ -300,7 +321,7 @@
 }
 
 .infoLabel {
-  color: #666;
+  color: hsl(var(--muted-foreground));
   font-weight: 500;
   text-transform: uppercase;
   font-size: 10px;
@@ -308,7 +329,7 @@
 }
 
 .infoValue {
-  color: #333;
+  color: hsl(var(--foreground));
   font-family: 'Courier New', monospace;
   font-weight: 600;
   font-size: 13px;
@@ -324,27 +345,27 @@
   font-family: 'Courier New', monospace;
   font-weight: 600;
   font-size: 13px;
-  color: #333;
-  background: #f8fafc;
-  border: 1px dashed #94a3b8;
-  border-radius: 6px;
+  color: hsl(var(--foreground));
+  background: hsl(var(--muted));
+  border: 1px dashed hsl(var(--border));
+  border-radius: 8px;
   cursor: pointer;
   text-align: left;
-  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .infoValueEditable:hover {
-  background: #f1f5f9;
-  border-color: #4a90e2;
+  background: hsl(var(--muted) / 0.8);
+  border-color: hsl(var(--primary));
   border-style: solid;
-  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.15);
+  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.15);
 }
 
 .infoValueEditable:focus-visible {
   outline: none;
-  border-color: #4a90e2;
+  border-color: hsl(var(--primary));
   border-style: solid;
-  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.3);
+  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.3);
 }
 
 .infoValueText {
@@ -355,12 +376,12 @@
 .infoValueIcon {
   width: 14px;
   height: 14px;
-  color: #64748b;
+  color: hsl(var(--muted-foreground));
   flex-shrink: 0;
 }
 
 .infoValueEditable:hover .infoValueIcon {
-  color: #4a90e2;
+  color: hsl(var(--primary));
 }
 
 /* Active editing state */
@@ -371,19 +392,19 @@
   font-family: 'Courier New', monospace;
   font-weight: 600;
   font-size: 13px;
-  color: #333;
-  background: #fff;
-  border: 2px solid #4a90e2;
-  border-radius: 6px;
+  color: hsl(var(--foreground));
+  background: hsl(var(--background));
+  border: 2px solid hsl(var(--primary));
+  border-radius: 8px;
   outline: none;
-  transition: box-shadow 0.2s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .infoValueInput::placeholder {
-  color: #94a3b8;
+  color: hsl(var(--muted-foreground));
   font-weight: 500;
 }
 
 .infoValueInput:focus {
-  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.25);
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.25);
 }
