@@ -25,7 +25,8 @@ export function ReelEditor({
   onExportError,
 }: ReelEditorProps) {
   const t = useTranslations('editor');
-  const { setCurrentClip, updateClipMetadata, currentClip, transcriptionState, setTranscriptionState, exportFormat, setExportFormat } = useReelEditorStore();
+  const tCommon = useTranslations('common');
+  const { setCurrentClip, updateClipMetadata, currentClip, transcriptionState, setTranscriptionState, exportFormat, setExportFormat, isEditingTranscription } = useReelEditorStore();
   const [processedClipData, setProcessedClipData] = useState<typeof clipData | null>(null);
 
   // Sync title prop to store so export/publish use latest title without re-initializing clip
@@ -149,10 +150,13 @@ export function ReelEditor({
             <div className={styles.formatToggle}>
               <button
                 className={styles.toggleSwitch}
-                onClick={() => setExportFormat(exportFormat === 'zoom' ? 'landscape' : 'zoom')}
+                onClick={() => !isEditingTranscription && setExportFormat(exportFormat === 'zoom' ? 'landscape' : 'zoom')}
                 role="switch"
                 aria-checked={exportFormat === 'landscape'}
+                aria-disabled={isEditingTranscription}
+                disabled={isEditingTranscription}
                 aria-label={`${t('format')}: ${exportFormat === 'zoom' ? t('zoom') : t('landscape')}`}
+                title={isEditingTranscription ? tCommon('disabledWhileEditingTranscription') : undefined}
               >
                 <span className={styles.toggleTrack}>
                   <span className={styles.toggleTextZoom}>{t('zoom')}</span>

@@ -13,7 +13,17 @@ export function TranscriptionEditor() {
   const trimStart = useReelEditorStore((state) => state.trimPoints.startTime);
   const trimEnd = useReelEditorStore((state) => state.trimPoints.endTime);
   const setCaptions = useReelEditorStore((state) => state.setCaptions);
+  const setIsEditingTranscription = useReelEditorStore(
+    (state) => state.setIsEditingTranscription,
+  );
   const [isEditing, setIsEditing] = useState(false);
+
+  // Sync store when leaving edit mode or unmounting so other controls stay in sync
+  useEffect(() => {
+    return () => {
+      setIsEditingTranscription(false);
+    };
+  }, [setIsEditingTranscription]);
 
   // Get a key that changes when trim points change (for forcing recalculation)
   const trimKey = useReelEditorStore(
@@ -230,12 +240,14 @@ export function TranscriptionEditor() {
 
     setCaptions(newCaptions);
     setIsEditing(false);
+    setIsEditingTranscription(false);
   };
 
   const handleCancel = () => {
     // Restore original text from current transcription
     setEditingText(transcriptionText);
     setIsEditing(false);
+    setIsEditingTranscription(false);
   };
 
   return (
@@ -244,7 +256,10 @@ export function TranscriptionEditor() {
         <h3 className={styles.title}>{t("fullTranscription")}</h3>
         {!isEditing ? (
           <button
-            onClick={() => setIsEditing(true)}
+            onClick={() => {
+              setIsEditing(true);
+              setIsEditingTranscription(true);
+            }}
             className={styles.editButton}
           >
             {t("editText")}
@@ -260,6 +275,15 @@ export function TranscriptionEditor() {
           </div>
         )}
       </div>
+
+      {isEditing && (
+        <p className={styles.editingHint} role="status" aria-live="polite">
+          <span className={styles.editingHintIcon} aria-hidden>
+            ℹ️
+          </span>
+          {t("editingHint")}
+        </p>
+      )}
 
       <div className={styles.textBoxContainer}>
         {isEditing ? (

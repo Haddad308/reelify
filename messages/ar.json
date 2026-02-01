@@ -11,7 +11,8 @@
     "seconds": "ثانية",
     "home": "الرئيسية",
     "privacyPolicy": "سياسة الخصوصية",
-    "termsAndConditions": "الشروط والأحكام"
+    "termsAndConditions": "الشروط والأحكام",
+    "disabledWhileEditingTranscription": "أتمم تعديل النص أعلاه لتفعيل هذا."
   },
   "home": {
     "title": "اصنع ريلز احترافية",
@@ -211,7 +212,8 @@
     "languageEnglish": "الإنجليزية",
     "language": "اللغة",
     "trimRange": "نطاق القص",
-    "emptyError": "لا يمكن أن يكون النص فارغاً"
+    "emptyError": "لا يمكن أن يكون النص فارغاً",
+    "editingHint": "التصدير والتنسيق والقص معطّلة أثناء التعديل. احفظ أو ألغِ لتفعيلها."
   },
   "transcriptionLoader": {
     "transcribing": "Transcribing Video...",

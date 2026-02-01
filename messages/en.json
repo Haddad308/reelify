@@ -2,6 +2,7 @@
   "common": {
     "closedBeta": "Closed Beta",
     "loading": "Loading...",
+    "disabledWhileEditingTranscription": "Finish editing the transcription to enable this.",
     "error": "An error occurred",
     "close": "Close",
     "back": "Back",
@@ -211,7 +212,8 @@
     "languageEnglish": "English",
     "language": "Language",
     "trimRange": "Trim range",
-    "emptyError": "Transcription cannot be empty"
+    "emptyError": "Transcription cannot be empty",
+    "editingHint": "Export, format, and trim are disabled while you edit. Save or cancel to enable them."
   },
   "transcriptionLoader": {
     "transcribing": "Transcribing Video...",

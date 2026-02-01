@@ -33,6 +33,7 @@ interface ReelEditorState {
   // UI state
   showSafeAreas: boolean;
   exportFormat: 'landscape' | 'zoom';
+  isEditingTranscription: boolean;
 
   // Actions
   setCurrentClip: (clip: ReelClipInput) => void;
@@ -56,6 +57,7 @@ interface ReelEditorState {
   setTranscriptionState: (state: TranscriptionState) => void;
   setShowSafeAreas: (show: boolean) => void;
   setExportFormat: (format: 'landscape' | 'zoom') => void;
+  setIsEditingTranscription: (editing: boolean) => void;
   reset: () => void;
 }
 
@@ -72,6 +74,7 @@ const initialState = {
   transcriptionState: { status: "idle" as const },
   showSafeAreas: false,
   exportFormat: 'zoom' as const,
+  isEditingTranscription: false,
 };
 
 export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
@@ -488,6 +491,10 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
 
   setExportFormat: (format) => {
     set({ exportFormat: format });
+  },
+
+  setIsEditingTranscription: (editing) => {
+    set({ isEditingTranscription: editing });
   },
 
   reset: () => {

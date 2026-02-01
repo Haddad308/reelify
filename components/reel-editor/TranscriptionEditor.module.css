@@ -59,6 +59,27 @@
   gap: 8px;
 }
 
+.editingHint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: hsl(var(--muted) / 0.8);
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  font-size: 13px;
+  color: hsl(var(--muted-foreground));
+  line-height: 1.4;
+}
+
+.editingHintIcon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  opacity: 0.9;
+}
+
 .saveButton {
   background: linear-gradient(
     135deg,

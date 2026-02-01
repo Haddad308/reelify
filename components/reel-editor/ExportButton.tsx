@@ -35,6 +35,7 @@ export function ExportButton({
   quality = 'medium',
 }: ExportButtonProps) {
   const t = useTranslations('exportButton');
+  const tCommon = useTranslations('common');
   const {
     currentClip,
     trimPoints,
@@ -44,6 +45,7 @@ export function ExportButton({
     setIsExporting,
     setExportProgress,
     exportFormat,
+    isEditingTranscription,
   } = useReelEditorStore();
 
   const { authStatus, isLoading: isAuthLoading, authenticate, logout } = useAuthStatus();
@@ -90,6 +92,13 @@ export function ExportButton({
       setDropdownPosition(null);
     }
   }, [showDropdown, mounted]);
+
+  // Close dropdown when user starts editing transcription
+  useEffect(() => {
+    if (isEditingTranscription && showDropdown) {
+      setShowDropdown(false);
+    }
+  }, [isEditingTranscription, showDropdown]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -302,9 +311,10 @@ export function ExportButton({
         <button
           ref={buttonRef}
           onClick={() => setShowDropdown(!showDropdown)}
-          disabled={!currentClip || isProcessing}
+          disabled={!currentClip || isProcessing || isEditingTranscription}
           className={styles.button}
           aria-expanded={showDropdown}
+          title={isEditingTranscription ? tCommon('disabledWhileEditingTranscription') : undefined}
         >
           {isProcessing ? (
             <>
@@ -319,7 +329,7 @@ export function ExportButton({
           )}
         </button>
 
-        {showDropdown && !isProcessing && dropdownPosition && mounted && createPortal(
+        {showDropdown && !isProcessing && !isEditingTranscription && dropdownPosition && mounted && createPortal(
           <div 
             ref={dropdownRef}
             className={styles.dropdown}
