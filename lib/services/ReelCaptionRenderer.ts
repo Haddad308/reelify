@@ -180,11 +180,13 @@ export class ReelCaptionRenderer {
     ctx.font = `${fontStyle} ${fontWeight} ${style.fontSize}px ${style.fontFamily}`;
     ctx.textBaseline = 'middle';
 
-    // Calculate max width for text wrapping (80% of video width with padding)
+    // Calculate max width for text wrapping (use maxWidth if specified, otherwise 80% of video width)
     const padding = style.padding || { top: 0, right: 0, bottom: 0, left: 0 };
-    const maxTextWidth = videoWidth 
-      ? (videoWidth * 0.8) - padding.left - padding.right
-      : 800; // Fallback width
+    const maxTextWidth = style.maxWidth 
+      ? style.maxWidth - padding.left - padding.right
+      : videoWidth 
+        ? (videoWidth * 0.8) - padding.left - padding.right
+        : 800; // Fallback width
 
     // Wrap text into multiple lines
     const lines = this.wrapText(ctx, text, maxTextWidth);
@@ -198,7 +200,8 @@ export class ReelCaptionRenderer {
 
     // Calculate background dimensions
     const bgWidth = textWidth + padding.left + padding.right;
-    const bgHeight = textHeight + padding.top + padding.bottom;
+    // Use customHeight if set by user (from resize), otherwise calculate from text
+    const bgHeight = style.customHeight || (textHeight + padding.top + padding.bottom);
 
     // Calculate text position based on alignment
     const textAlign = style.textAlign || 'center';
@@ -330,11 +333,13 @@ export class ReelCaptionRenderer {
     ctx.font = `${fontStyle} ${fontWeight} ${style.fontSize}px ${style.fontFamily}`;
     ctx.textBaseline = 'middle';
 
-    // Calculate max width for text wrapping (80% of video width with padding)
+    // Calculate max width for text wrapping (use maxWidth if specified, otherwise 80% of video width)
     const padding = style.padding || { top: 0, right: 0, bottom: 0, left: 0 };
-    const maxTextWidth = videoWidth 
-      ? (videoWidth * 0.8) - padding.left - padding.right
-      : 800; // Fallback width
+    const maxTextWidth = style.maxWidth 
+      ? style.maxWidth - padding.left - padding.right
+      : videoWidth 
+        ? (videoWidth * 0.8) - padding.left - padding.right
+        : 800; // Fallback width
 
     // Wrap segments into multiple lines
     const wrappedLines = this.wrapSegments(

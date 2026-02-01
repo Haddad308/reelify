@@ -40,6 +40,8 @@ export interface CaptionStyle {
   strokeColor?: string;
   strokeWidth?: number;
   opacity?: number;
+  maxWidth?: number; // Maximum width of the caption box in pixels
+  customHeight?: number; // Custom height set by user resize (optional, auto-calculates if not set)
   
   // NEW: Animation
   animation?: {

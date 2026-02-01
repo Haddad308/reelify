@@ -2,10 +2,25 @@ import { create } from "zustand";
 import {
   ReelClipInput,
   Caption,
+  CaptionStyle,
   TrimPoints,
   TranscriptionState,
 } from "@/types";
 import { filterVisibleCaptions } from "@/lib/utils/reelEditorUtils";
+
+// Default caption style
+const getDefaultCaptionStyle = (): CaptionStyle => ({
+  fontSize: 48,
+  fontFamily: "Arial",
+  color: "#FFFFFF",
+  backgroundColor: "rgba(0, 0, 0, 0.7)",
+  textAlign: "center",
+  padding: { top: 10, right: 20, bottom: 10, left: 20 },
+  maxWidth: 800,
+});
+
+// Default caption position
+const getDefaultCaptionPosition = () => ({ x: 540, y: 1500 });
 
 interface ReelEditorState {
   // Current clip data
@@ -18,6 +33,7 @@ interface ReelEditorState {
   // Captions
   captions: Caption[];
   selectedCaptionId: string | null;
+  lastEditedCaptionStyle: Caption["style"] | null; // Track last edited caption style for new captions
 
   // Playback state
   currentPlayheadTime: number;
@@ -64,6 +80,7 @@ const initialState = {
   trimPoints: { startTime: 0, endTime: 0 },
   captions: [],
   selectedCaptionId: null,
+  lastEditedCaptionStyle: null,
   currentPlayheadTime: 0,
   isPlaying: false,
   isExporting: false,
@@ -117,19 +134,25 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
         overlappingSegments: overlappingSegments.length,
       });
 
+      // Use last edited style if available, otherwise use default
+      const { lastEditedCaptionStyle } = get();
+      const defaultStyle = getDefaultCaptionStyle();
+      const captionStyle = lastEditedCaptionStyle || defaultStyle;
+      const captionPosition = getDefaultCaptionPosition();
+
       const captions: Caption[] = overlappingSegments.map((segment, index) => ({
         id: `caption-${index}`,
         text: segment.text,
         startTime: segment.start,
         endTime: segment.end,
-        position: { x: 540, y: 1500 }, // Default position (center-bottom for 9:16)
+        position: { ...captionPosition }, // Deep copy position
         style: {
-          fontSize: 48,
-          fontFamily: "Arial",
-          color: "#FFFFFF",
-          backgroundColor: "rgba(0, 0, 0, 0.7)",
-          textAlign: "center",
-          padding: { top: 10, right: 20, bottom: 10, left: 20 },
+          ...captionStyle,
+          padding: captionStyle.padding ? { ...captionStyle.padding } : undefined,
+          // Deep copy nested objects
+          animation: captionStyle.animation ? { ...captionStyle.animation } : undefined,
+          shadow: captionStyle.shadow ? { ...captionStyle.shadow } : undefined,
+          keywordHighlights: captionStyle.keywordHighlights ? [...captionStyle.keywordHighlights] : undefined,
         },
         isVisible: true,
         language: segment.language,
@@ -316,31 +339,33 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
           .map((s) => s.text.substring(0, 40) + "..."),
       });
 
-      // Preserve existing caption styles if available
-      const existingStyle =
-        captions.length > 0
-          ? captions[0].style
-          : {
-              fontSize: 48,
-              fontFamily: "Arial",
-              color: "#FFFFFF",
-              backgroundColor: "rgba(0, 0, 0, 0.7)",
-              textAlign: "center" as const,
-              padding: { top: 10, right: 20, bottom: 10, left: 20 },
-            };
+      // Use last edited style if available, otherwise try existing captions, otherwise default
+      const { lastEditedCaptionStyle } = get();
+      const defaultStyle = getDefaultCaptionStyle();
+      // Always prefer last edited style - this ensures consistency
+      const styleToApply = lastEditedCaptionStyle || 
+        (captions.length > 0 ? captions[0].style : defaultStyle);
 
       const existingPosition =
-        captions.length > 0 ? captions[0].position : { x: 540, y: 1500 };
+        captions.length > 0 ? captions[0].position : getDefaultCaptionPosition();
 
       // Create new captions from overlapping segments
+      // IMPORTANT: Create a deep copy of the style for each caption to avoid reference sharing
       const newCaptions: Caption[] = overlappingSegments.map(
         (segment, index) => ({
           id: `caption-${trimPoints.startTime.toFixed(1)}-${index}`,
           text: segment.text,
           startTime: segment.start,
           endTime: segment.end,
-          position: existingPosition,
-          style: existingStyle,
+          position: { ...existingPosition }, // Deep copy position
+          style: {
+            ...styleToApply,
+            padding: styleToApply.padding ? { ...styleToApply.padding } : undefined,
+            // Deep copy nested objects
+            animation: styleToApply.animation ? { ...styleToApply.animation } : undefined,
+            shadow: styleToApply.shadow ? { ...styleToApply.shadow } : undefined,
+            keywordHighlights: styleToApply.keywordHighlights ? [...styleToApply.keywordHighlights] : undefined,
+          },
           isVisible: true,
           language: segment.language || "ar",
         }),
@@ -430,17 +455,63 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
   },
 
   updateCaptionPosition: (id, position) => {
-    get().updateCaption(id, { position });
+    const { captions } = get();
+    // Apply the same position to ALL captions to ensure consistency
+    const updatedCaptions = captions.map((caption) => ({
+      ...caption,
+      position: { ...position }, // Apply same position to all captions
+    }));
+    set({ captions: updatedCaptions });
   },
 
   updateCaptionStyle: (id, style) => {
-    const { captions } = get();
+    const { captions, selectedCaptionId } = get();
+    
+    // Update the specific caption
     const updatedCaptions = captions.map((caption) =>
       caption.id === id
         ? { ...caption, style: { ...caption.style, ...style } }
         : caption,
     );
-    set({ captions: updatedCaptions });
+    // Track the last edited caption style for new captions
+    const editedCaption = updatedCaptions.find((c) => c.id === id);
+    if (editedCaption) {
+      const newStyle = editedCaption.style;
+      // Apply the same style to ALL other captions to ensure consistency
+      // IMPORTANT: Preserve each caption's position - only update style properties
+      const allUpdatedCaptions = updatedCaptions.map((caption) => {
+        if (caption.id === id) {
+          return caption; // Already updated
+        }
+        // Apply the same style to all other captions, but preserve their individual positions
+        return {
+          ...caption,
+          position: { ...caption.position }, // Preserve individual position
+          style: {
+            ...newStyle,
+            // Deep copy nested objects
+            padding: newStyle.padding ? { ...newStyle.padding } : undefined,
+            animation: newStyle.animation ? { ...newStyle.animation } : undefined,
+            shadow: newStyle.shadow ? { ...newStyle.shadow } : undefined,
+            keywordHighlights: newStyle.keywordHighlights ? [...newStyle.keywordHighlights] : undefined,
+            // Ensure maxWidth and customHeight are applied consistently
+            maxWidth: newStyle.maxWidth,
+            customHeight: newStyle.customHeight,
+          },
+        };
+      });
+      
+      // CRITICAL: Preserve selectedCaptionId - don't clear it when updating styles
+      // The selected caption should still exist since we're just updating styles, not removing captions
+      set({ 
+        captions: allUpdatedCaptions,
+        lastEditedCaptionStyle: newStyle,
+        // Explicitly preserve selectedCaptionId - don't change it
+        selectedCaptionId: selectedCaptionId,
+      });
+    } else {
+      set({ captions: updatedCaptions });
+    }
   },
 
   setSelectedCaptionId: (id) => {

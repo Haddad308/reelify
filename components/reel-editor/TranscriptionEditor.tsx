@@ -12,6 +12,7 @@ export function TranscriptionEditor() {
   const currentClip = useReelEditorStore((state) => state.currentClip);
   const trimStart = useReelEditorStore((state) => state.trimPoints.startTime);
   const trimEnd = useReelEditorStore((state) => state.trimPoints.endTime);
+  const lastEditedCaptionStyle = useReelEditorStore((state) => state.lastEditedCaptionStyle);
   const setCaptions = useReelEditorStore((state) => state.setCaptions);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -195,23 +196,24 @@ export function TranscriptionEditor() {
     const totalDuration = trimEnd - trimStart;
     const segmentDuration = totalDuration / Math.max(sentences.length, 1);
 
-    // Preserve existing caption styles if available
-    const existingStyle =
-      captions.length > 0
-        ? captions[0].style
-        : {
-            fontSize: 48,
-            fontFamily: "Arial",
-            color: "#FFFFFF",
-            backgroundColor: "rgba(0, 0, 0, 0.7)",
-            textAlign: "center" as const,
-            padding: { top: 10, right: 20, bottom: 10, left: 20 },
-          };
+    // Use last edited style if available, otherwise try existing captions, otherwise default
+    const defaultStyle = {
+      fontSize: 48,
+      fontFamily: "Arial",
+      color: "#FFFFFF",
+      backgroundColor: "rgba(0, 0, 0, 0.7)",
+      textAlign: "center" as const,
+      padding: { top: 10, right: 20, bottom: 10, left: 20 },
+      maxWidth: 800,
+    };
+    const existingStyle = lastEditedCaptionStyle || 
+      (captions.length > 0 ? captions[0].style : defaultStyle);
 
     const existingPosition =
       captions.length > 0 ? captions[0].position : { x: 540, y: 1500 };
 
     // Create new captions from edited text within trim range
+    // IMPORTANT: Create deep copies of style and position to avoid reference sharing
     const newCaptions = sentences.map((text, index) => {
       const startTime = trimStart + index * segmentDuration;
       const endTime = startTime + segmentDuration;
@@ -221,8 +223,15 @@ export function TranscriptionEditor() {
         text: text.trim(),
         startTime,
         endTime,
-        position: existingPosition, // Preserve position
-        style: existingStyle, // Preserve style
+        position: { ...existingPosition }, // Deep copy position
+        style: {
+          ...existingStyle,
+          // Deep copy nested objects
+          padding: existingStyle.padding ? { ...existingStyle.padding } : undefined,
+          animation: existingStyle.animation ? { ...existingStyle.animation } : undefined,
+          shadow: existingStyle.shadow ? { ...existingStyle.shadow } : undefined,
+          keywordHighlights: existingStyle.keywordHighlights ? [...existingStyle.keywordHighlights] : undefined,
+        },
         isVisible: true,
         language: detectedLanguage, // Use detected language
       };

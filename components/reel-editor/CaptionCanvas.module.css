@@ -1,11 +1,156 @@
 .container {
+  /* CRITICAL: Absolutely position to overlay videoWrapper area */
+  /* videoPlayerWrapper has position: relative, so this positions relative to it */
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  /* Match videoWrapper height exactly - it's flex: 1 in VideoPlayer.container */
+  /* VideoPlayer.container = 100% height, videoWrapper = flex: 1, controls = 56px */
+  height: calc(100% - 56px) !important;
+  pointer-events: none !important; /* CRITICAL: Never block video */
+  z-index: 10 !important;
+  touch-action: none;
+  margin: 0 !important;
+  padding: 0 !important;
+  /* Match videoWrapper's centering for canvas */
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden;
+  /* Ensure it doesn't participate in parent flex layout */
+  flex: none !important;
+}
+
+/* Don't enable pointer-events on container - it blocks video
+   Instead, Moveable will use document-level listeners */
+
+/* Canvas should render captions on top of video */
+.container > canvas {
+  pointer-events: auto !important;
+  z-index: 1;
+  /* Canvas should match video's rendered size exactly */
+  /* Video has object-fit: contain, so it maintains aspect ratio */
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
   position: absolute;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 100;
+  /* Transparent background so video shows through, but captions will be visible */
+  background: transparent;
+  /* Match video's object-fit to ensure captions align with video content */
+  object-fit: contain;
+  /* Ensure canvas overlays video exactly */
+  display: block;
+}
+
+/* Moveable target should be above canvas but below video controls */
+.moveableTarget {
+  z-index: 5000 !important; /* Above canvas but below controls (10000) */
+  pointer-events: none !important; /* Disable dragging from target - only handle is draggable */
+  cursor: default !important; /* Default cursor - not draggable */
+  /* Ensure it's on top and positioned correctly */
+  position: absolute !important;
+  /* Transparent background so video shows through */
+  background: transparent !important;
+}
+
+/* Drag handle extension - THE ONLY place where dragging is allowed */
+.dragHandle {
+  z-index: 5002 !important; /* Above resize handles (5001) */
+  pointer-events: auto !important;
+  cursor: move !important;
+  position: absolute !important;
+  background: rgba(255, 107, 122, 1) !important;
+  border-radius: 4px !important;
+  border: 1.5px solid rgba(255, 255, 255, 1) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 107, 122, 0.5) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 16px !important;
+  height: 16px !important;
+  /* No transitions or animations - instant feedback */
+}
+
+/* Visual indicator - horizontal dashes to show it's draggable */
+.dragHandle::before {
+  content: "" !important;
+  position: absolute !important;
+  width: 6px !important;
+  height: 1.5px !important;
+  background: rgba(255, 255, 255, 1) !important;
+  border-radius: 1px !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  pointer-events: none !important;
+  box-shadow: 
+    0 -3px 0 rgba(255, 255, 255, 1),
+    0 3px 0 rgba(255, 255, 255, 1) !important;
+}
+
+.dragHandle:hover {
+  cursor: grab !important;
+  background: rgba(255, 107, 122, 1) !important;
+}
+
+.dragHandle:active {
+  cursor: grabbing !important;
+  background: rgba(229, 82, 95, 1) !important;
+}
+
+.dragHandleIcon {
+  color: white !important;
+  font-size: 8px !important;
+  font-weight: bold !important;
+  line-height: 1 !important;
+  user-select: none !important;
+  pointer-events: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  height: 100% !important;
+  opacity: 1 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Moveable controls (resize handles) - Moveable adds these dynamically */
+/* They should be above the target but below video controls */
+:global(.moveable-control-box) {
+  pointer-events: auto !important;
+  z-index: 5001 !important; /* Above target */
+}
+
+:global(.moveable-control) {
+  pointer-events: auto !important;
+  z-index: 5001 !important;
+}
+
+:global(.moveable-line) {
+  pointer-events: auto !important;
+  z-index: 5001 !important;
+}
+
+:global(.moveable-direction) {
+  pointer-events: auto !important;
+  z-index: 5001 !important;
+  background: rgba(255, 107, 122, 0.95) !important;
+  border: 0.5px solid rgba(255, 255, 255, 0.7) !important;
+  border-radius: 3px !important;
+}
+
+:global(.moveable-direction:hover) {
+  background: rgba(255, 107, 122, 1) !important;
+  border-color: rgba(255, 255, 255, 0.9) !important;
+}
+
+:global(.moveable-direction:active) {
+  background: rgba(229, 82, 95, 1) !important;
+  border-color: rgba(255, 255, 255, 0.9) !important;
 }
 
 .canvas {
@@ -63,3 +208,4 @@
     opacity: 0.7;
   }
 }
+

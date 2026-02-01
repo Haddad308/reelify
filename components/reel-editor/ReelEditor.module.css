@@ -232,6 +232,8 @@
   flex-shrink: 1;
   margin: 0 auto;
   box-sizing: border-box;
+  /* Ensure proper stacking context */
+  isolation: isolate;
 }
 
 /* Both formats use 9:16 aspect ratio */
