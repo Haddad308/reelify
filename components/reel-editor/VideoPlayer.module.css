@@ -10,7 +10,8 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  box-shadow: 0 4px 10px -2px rgba(0, 0, 0, 0.06),
+  box-shadow:
+    0 4px 10px -2px rgba(0, 0, 0, 0.06),
     0 18px 40px -12px rgba(0, 0, 0, 0.12);
   animation: fadeInScale 0.5s ease-out forwards;
   /* Allow clicks to pass through to CaptionCanvas, but controls still work */
@@ -101,10 +102,9 @@
   color: #fff;
   font-size: 18px;
   font-weight: 600;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
 }
-
 
 .controls {
   display: flex !important;
@@ -187,7 +187,9 @@
 .timeDisplay {
   display: flex;
   align-items: baseline;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui,
+    sans-serif;
   font-size: 10px;
   font-weight: 500;
   color: #999;

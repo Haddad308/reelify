@@ -9,7 +9,7 @@ export interface ReelClipInput {
       text: string;
       start: number; // Timestamp in seconds (relative to full video)
       end: number; // Timestamp in seconds (relative to full video)
-      language: 'ar' | 'en'; // Arabic or English
+      language: "ar" | "en"; // Arabic or English
     }>;
   };
   metadata?: {
@@ -19,7 +19,7 @@ export interface ReelClipInput {
 }
 
 export interface TranscriptionState {
-  status: 'idle' | 'loading' | 'success' | 'error';
+  status: "idle" | "loading" | "success" | "error";
   error?: string;
 }
 
@@ -30,7 +30,7 @@ export interface CaptionStyle {
   fontStyle?: string;
   color: string;
   backgroundColor?: string;
-  textAlign?: 'left' | 'center' | 'right' | 'justify';
+  textAlign?: "left" | "center" | "right" | "justify";
   padding?: {
     top: number;
     right: number;
@@ -42,15 +42,23 @@ export interface CaptionStyle {
   opacity?: number;
   maxWidth?: number; // Maximum width of the caption box in pixels
   customHeight?: number; // Custom height set by user resize (optional, auto-calculates if not set)
-  
+
   // NEW: Animation
   animation?: {
-    type: 'none' | 'fade' | 'slideLeft' | 'slideRight' | 'slideTop' | 'slideBottom' | 'typewriter' | 'scale';
+    type:
+      | "none"
+      | "fade"
+      | "slideLeft"
+      | "slideRight"
+      | "slideTop"
+      | "slideBottom"
+      | "typewriter"
+      | "scale";
     duration: number; // in seconds
     delay: number; // delay before animation starts
-    easing: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
+    easing: "linear" | "easeIn" | "easeOut" | "easeInOut";
   };
-  
+
   // NEW: Shadow
   shadow?: {
     color: string;
@@ -58,10 +66,10 @@ export interface CaptionStyle {
     offsetY: number;
     blur: number;
   };
-  
+
   // NEW: Capitalization
-  textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
-  
+  textTransform?: "none" | "uppercase" | "lowercase" | "capitalize";
+
   // NEW: Keyword Highlighting
   keywordHighlights?: Array<{
     text: string; // The keyword/phrase to highlight
@@ -79,7 +87,7 @@ export interface Caption {
   position: { x: number; y: number };
   style: CaptionStyle;
   isVisible: boolean; // Whether caption is within trim region
-  language?: 'ar' | 'en';
+  language?: "ar" | "en";
 }
 
 export interface ReelExportResult {
@@ -103,9 +111,10 @@ export interface ReelEditorCallbacks {
 
 export interface ReelEditorProps extends ReelEditorCallbacks {
   clipData: ReelClipInput;
-  theme?: 'light' | 'dark';
-  aspectRatio?: '9:16' | '16:9' | '1:1';
-  exportQuality?: 'low' | 'medium' | 'high';
+  title?: string;
+  theme?: "light" | "dark";
+  aspectRatio?: "9:16" | "16:9" | "1:1";
+  exportQuality?: "low" | "medium" | "high";
 }
 
 export interface TrimPoints {
@@ -113,8 +122,8 @@ export interface TrimPoints {
   endTime: number;
 }
 
-export type ExportFormat = 'landscape' | 'zoom';
-export type ReframingMode = 'none' | 'face' | 'speaker' | 'motion' | 'smart';
+export type ExportFormat = "landscape" | "zoom";
+export type ReframingMode = "none" | "face" | "speaker" | "motion" | "smart";
 
 export interface ReframingOptions {
   mode: ReframingMode;

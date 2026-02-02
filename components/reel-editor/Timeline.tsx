@@ -10,12 +10,14 @@ import styles from './Timeline.module.css';
 
 export function Timeline() {
   const t = useTranslations('timeline');
+  const tCommon = useTranslations('common');
   const {
     sourceVideoDuration,
     trimPoints,
     currentPlayheadTime,
     updateTrimStart,
     updateTrimEnd,
+    isEditingTranscription,
   } = useReelEditorStore();
 
   // Track which slider is being dragged to prevent interference
@@ -30,6 +32,14 @@ export function Timeline() {
   // Use trim points directly without auto-correction
   const safeTrimPoints = trimPoints;
 
+
+  // Clear timecode input edit state when user starts editing transcription
+  useEffect(() => {
+    if (isEditingTranscription) {
+      setStartTimeEdit(null);
+      setEndTimeEdit(null);
+    }
+  }, [isEditingTranscription]);
 
   // Handle global pointer events to prevent slider interference
   useEffect(() => {
@@ -201,13 +211,15 @@ export function Timeline() {
             min={0}
             max={sourceVideoDuration}
             step={0.1}
+            disabled={isEditingTranscription}
+            title={isEditingTranscription ? tCommon('disabledWhileEditingTranscription') : undefined}
           >
             <Slider.Track className={styles.markerTrack}>
               <Slider.Range className={styles.markerRange} />
             </Slider.Track>
             <Slider.Thumb 
               className={`${styles.markerThumb} ${styles.endMarker}`} 
-              aria-label={t('endMarker')}
+              aria-label={isEditingTranscription ? tCommon('disabledWhileEditingTranscription') : t('endMarker')}
               onPointerDown={() => {
                 draggingSliderRef.current = 'end';
                 setDraggingSlider('end');
@@ -225,13 +237,15 @@ export function Timeline() {
             min={0}
             max={sourceVideoDuration}
             step={0.1}
+            disabled={isEditingTranscription}
+            title={isEditingTranscription ? tCommon('disabledWhileEditingTranscription') : undefined}
           >
             <Slider.Track className={styles.markerTrack}>
               <Slider.Range className={styles.markerRange} />
             </Slider.Track>
             <Slider.Thumb 
               className={`${styles.markerThumb} ${styles.startMarker}`} 
-              aria-label={t('startMarker')}
+              aria-label={isEditingTranscription ? tCommon('disabledWhileEditingTranscription') : t('startMarker')}
               onPointerDown={() => {
                 draggingSliderRef.current = 'start';
                 setDraggingSlider('start');
@@ -253,20 +267,20 @@ export function Timeline() {
             <button
               type="button"
               onClick={handleStartPlus}
-              disabled={safeTrimPoints.startTime <= 0}
+              disabled={isEditingTranscription || safeTrimPoints.startTime <= 0}
               className={styles.trimBtn}
-              title={t('startBefore')}
-              aria-label={t('startBefore')}
+              title={isEditingTranscription ? tCommon('disabledWhileEditingTranscription') : t('startBefore')}
+              aria-label={isEditingTranscription ? tCommon('disabledWhileEditingTranscription') : t('startBefore')}
             >
               +1s
             </button>
             <button
               type="button"
               onClick={handleStartMinus}
-              disabled={safeTrimPoints.startTime >= safeTrimPoints.endTime - minDuration}
+              disabled={isEditingTranscription || safeTrimPoints.startTime >= safeTrimPoints.endTime - minDuration}
               className={styles.trimBtn}
-              title={t('startAfter')}
-              aria-label={t('startAfter')}
+              title={isEditingTranscription ? tCommon('disabledWhileEditingTranscription') : t('startAfter')}
+              aria-label={isEditingTranscription ? tCommon('disabledWhileEditingTranscription') : t('startAfter')}
             >
               −1s
             </button>
@@ -278,20 +292,20 @@ export function Timeline() {
             <button
               type="button"
               onClick={handleEndMinus}
-              disabled={safeTrimPoints.endTime <= safeTrimPoints.startTime + minDuration}
+              disabled={isEditingTranscription || safeTrimPoints.endTime <= safeTrimPoints.startTime + minDuration}
               className={styles.trimBtn}
-              title={t('endBefore')}
-              aria-label={t('endBefore')}
+              title={isEditingTranscription ? tCommon('disabledWhileEditingTranscription') : t('endBefore')}
+              aria-label={isEditingTranscription ? tCommon('disabledWhileEditingTranscription') : t('endBefore')}
             >
               −1s
             </button>
             <button
               type="button"
               onClick={handleEndPlus}
-              disabled={safeTrimPoints.endTime >= sourceVideoDuration}
+              disabled={isEditingTranscription || safeTrimPoints.endTime >= sourceVideoDuration}
               className={styles.trimBtn}
-              title={t('endAfter')}
-              aria-label={t('endAfter')}
+              title={isEditingTranscription ? tCommon('disabledWhileEditingTranscription') : t('endAfter')}
+              aria-label={isEditingTranscription ? tCommon('disabledWhileEditingTranscription') : t('endAfter')}
             >
               +1s
             </button>
@@ -317,14 +331,17 @@ export function Timeline() {
               placeholder={t('timecodePlaceholder')}
               aria-label={t('start')}
               autoFocus
+              disabled={isEditingTranscription}
+              title={isEditingTranscription ? tCommon('disabledWhileEditingTranscription') : undefined}
             />
           ) : (
             <button
               type="button"
               className={styles.infoValueEditable}
-              onClick={() => setStartTimeEdit(secondsToTimecode(safeTrimPoints.startTime))}
-              title={t('clickToEdit')}
-              aria-label={t('clickToEdit')}
+              onClick={() => !isEditingTranscription && setStartTimeEdit(secondsToTimecode(safeTrimPoints.startTime))}
+              title={isEditingTranscription ? tCommon('disabledWhileEditingTranscription') : t('clickToEdit')}
+              aria-label={isEditingTranscription ? tCommon('disabledWhileEditingTranscription') : t('clickToEdit')}
+              disabled={isEditingTranscription}
             >
               <span className={styles.infoValueText}>{secondsToTimecode(safeTrimPoints.startTime)}</span>
               <Pencil className={styles.infoValueIcon} aria-hidden />
@@ -347,14 +364,17 @@ export function Timeline() {
               placeholder={t('timecodePlaceholder')}
               aria-label={t('end')}
               autoFocus
+              disabled={isEditingTranscription}
+              title={isEditingTranscription ? tCommon('disabledWhileEditingTranscription') : undefined}
             />
           ) : (
             <button
               type="button"
               className={styles.infoValueEditable}
-              onClick={() => setEndTimeEdit(secondsToTimecode(safeTrimPoints.endTime))}
-              title={t('clickToEdit')}
-              aria-label={t('clickToEdit')}
+              onClick={() => !isEditingTranscription && setEndTimeEdit(secondsToTimecode(safeTrimPoints.endTime))}
+              title={isEditingTranscription ? tCommon('disabledWhileEditingTranscription') : t('clickToEdit')}
+              aria-label={isEditingTranscription ? tCommon('disabledWhileEditingTranscription') : t('clickToEdit')}
+              disabled={isEditingTranscription}
             >
               <span className={styles.infoValueText}>{secondsToTimecode(safeTrimPoints.endTime)}</span>
               <Pencil className={styles.infoValueIcon} aria-hidden />

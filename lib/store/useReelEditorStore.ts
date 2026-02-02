@@ -48,10 +48,24 @@ interface ReelEditorState {
 
   // UI state
   showSafeAreas: boolean;
-  exportFormat: 'landscape' | 'zoom';
+  exportFormat: "landscape" | "zoom";
+  isEditingTranscription: boolean;
+
+  // Full-video transcription source (widest segment list) for extend trim and restore original
+  fullTranscriptionSegments: Array<{
+    text: string;
+    start: number;
+    end: number;
+    language?: "ar" | "en";
+  }>;
+  hasUserEditedTranscription: boolean;
 
   // Actions
   setCurrentClip: (clip: ReelClipInput) => void;
+  updateClipMetadata: (metadata: {
+    title?: string;
+    description?: string;
+  }) => void;
   setSourceVideoDuration: (duration: number) => void;
   setTrimPoints: (trimPoints: TrimPoints) => void;
   updateTrimStart: (startTime: number) => void;
@@ -70,7 +84,18 @@ interface ReelEditorState {
   setExportProgress: (progress: number) => void;
   setTranscriptionState: (state: TranscriptionState) => void;
   setShowSafeAreas: (show: boolean) => void;
-  setExportFormat: (format: 'landscape' | 'zoom') => void;
+  setExportFormat: (format: "landscape" | "zoom") => void;
+  setIsEditingTranscription: (editing: boolean) => void;
+  setFullTranscriptionSegments: (
+    segments: Array<{
+      text: string;
+      start: number;
+      end: number;
+      language?: "ar" | "en";
+    }>,
+  ) => void;
+  setHasUserEditedTranscription: (value: boolean) => void;
+  restoreOriginalTranscriptionForCurrentTrim: () => void;
   reset: () => void;
 }
 
@@ -87,7 +112,10 @@ const initialState = {
   exportProgress: 0,
   transcriptionState: { status: "idle" as const },
   showSafeAreas: false,
-  exportFormat: 'zoom' as const,
+  exportFormat: "zoom" as const,
+  isEditingTranscription: false,
+  fullTranscriptionSegments: [],
+  hasUserEditedTranscription: false,
 };
 
 export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
@@ -102,6 +130,19 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
       sourceVideoDuration: clip.sourceVideoDuration,
     });
 
+    // Persist full transcription segments for extend-trim and restore-original
+    const fullSegments =
+      clip.transcription?.segments?.map((seg) => ({
+        text: String(seg.text || "").trim(),
+        start: Number(seg.start) || 0,
+        end: Number(seg.end) || 0,
+        language:
+          seg.language ||
+          ((/[\u0600-\u06FF]/.test(String(seg.text)) ? "ar" : "en") as
+            | "ar"
+            | "en"),
+      })) ?? [];
+
     // IMPORTANT: Store the clip with ALL transcription segments intact
     // Do NOT filter segments here - we need the full transcription for expanding trim boundaries
     set({
@@ -112,6 +153,8 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
         endTime: clip.endTime,
       },
       currentPlayheadTime: clip.startTime,
+      fullTranscriptionSegments: fullSegments,
+      hasUserEditedTranscription: false,
     });
 
     // Initialize captions from transcription (if available)
@@ -148,11 +191,22 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
         position: { ...captionPosition }, // Deep copy position
         style: {
           ...captionStyle,
-          padding: captionStyle.padding ? { ...captionStyle.padding } : undefined,
+          padding: captionStyle.padding
+            ? { ...captionStyle.padding }
+            : { top: 10, right: 20, bottom: 10, left: 20 },
           // Deep copy nested objects
-          animation: captionStyle.animation ? { ...captionStyle.animation } : undefined,
+          animation: captionStyle.animation
+            ? { ...captionStyle.animation }
+            : undefined,
           shadow: captionStyle.shadow ? { ...captionStyle.shadow } : undefined,
-          keywordHighlights: captionStyle.keywordHighlights ? [...captionStyle.keywordHighlights] : undefined,
+          keywordHighlights: captionStyle.keywordHighlights
+            ? [...captionStyle.keywordHighlights]
+            : undefined,
+          fontSize: 48,
+          fontFamily: "Arial",
+          color: "#FFFFFF",
+          backgroundColor: "rgba(0, 0, 0, 0.7)",
+          textAlign: "center",
         },
         isVisible: true,
         language: segment.language,
@@ -166,6 +220,20 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
       );
       set({ captions: [] });
     }
+  },
+
+  updateClipMetadata: (metadata) => {
+    const { currentClip } = get();
+    if (!currentClip) return;
+    set({
+      currentClip: {
+        ...currentClip,
+        metadata: {
+          ...currentClip.metadata,
+          ...metadata,
+        },
+      },
+    });
   },
 
   setSourceVideoDuration: (duration) => {
@@ -214,48 +282,42 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
   },
 
   setTrimPoints: (trimPoints) => {
-    const { captions, currentClip } = get();
+    const {
+      captions,
+      currentClip,
+      fullTranscriptionSegments,
+      hasUserEditedTranscription,
+    } = get();
 
     console.log("[Store] setTrimPoints called:", {
       startTime: trimPoints.startTime,
       endTime: trimPoints.endTime,
       hasTranscription: !!currentClip?.transcription,
       currentCaptionsCount: captions.length,
+      hasUserEditedTranscription,
       sourceVideoDuration: get().sourceVideoDuration,
     });
 
-    // ALWAYS try to get ALL segments from full video transcription
-    // Priority: sessionStorage > currentClip.transcription
-    let allSegments: Array<{
+    type SegmentLike = {
       text: string;
       start: number;
       end: number;
       language?: "ar" | "en";
-    }> = [];
+    };
+
+    let allSegments: SegmentLike[] = [];
 
     // First try sessionStorage, then localStorage (full video transcription)
     if (typeof window !== "undefined") {
       try {
         let raw = window.sessionStorage.getItem("reelify_segments");
         let source = "sessionStorage";
-
-        // Fallback to localStorage (cross-tab)
         if (!raw) {
           raw = window.localStorage.getItem("reelify_segments");
           source = "localStorage";
         }
-
-        console.log(
-          `[Store] Raw ${source} data:`,
-          raw ? `Found ${raw.length} chars` : "null",
-        );
-
         if (raw) {
           const data = JSON.parse(raw);
-          console.log(`[Store] Parsed ${source} data:`, {
-            isArray: Array.isArray(data),
-            length: Array.isArray(data) ? data.length : 0,
-          });
           if (Array.isArray(data) && data.length > 0) {
             allSegments = data
               .map((seg: any) => ({
@@ -268,38 +330,17 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
                     | "ar"
                     | "en"),
               }))
-              .filter((seg) => seg.text.length > 0);
-            console.log(`[Store] Loaded segments from ${source}:`, {
-              count: allSegments.length,
-              timeRange:
-                allSegments.length > 0
-                  ? `${allSegments[0].start.toFixed(1)}s - ${allSegments[allSegments.length - 1].end.toFixed(1)}s`
-                  : "N/A",
-              firstSegment: allSegments[0]
-                ? `${allSegments[0].start.toFixed(1)}-${allSegments[0].end.toFixed(1)}: ${allSegments[0].text.substring(0, 30)}`
-                : "N/A",
-              lastSegment:
-                allSegments.length > 0
-                  ? `${allSegments[allSegments.length - 1].start.toFixed(1)}-${allSegments[allSegments.length - 1].end.toFixed(1)}: ${allSegments[allSegments.length - 1].text.substring(0, 30)}`
-                  : "N/A",
-            });
-
-            // Ensure both storages have the data
+              .filter((seg: SegmentLike) => seg.text.length > 0);
             if (source === "localStorage") {
               window.sessionStorage.setItem("reelify_segments", raw);
             }
           }
-        } else {
-          console.warn(
-            "[Store] No segments found in sessionStorage or localStorage",
-          );
         }
       } catch (error) {
         console.warn("[Store] Failed to read segments from storage:", error);
       }
     }
 
-    // Fallback to currentClip transcription (should also have full video transcription)
     if (allSegments.length === 0 && currentClip?.transcription?.segments) {
       allSegments = currentClip.transcription.segments.map((seg) => ({
         text: String(seg.text || "").trim(),
@@ -311,86 +352,199 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
             | "ar"
             | "en"),
       }));
-      console.log(
-        "[Store] Loaded segments from currentClip.transcription:",
-        allSegments.length,
-      );
     }
 
-    // If we have segments, ALWAYS regenerate captions based on new trim range
-    if (allSegments.length > 0) {
-      // Filter segments that overlap with the NEW trim range
-      // Use overlap detection: segment overlaps if it starts before trim end AND ends after trim start
-      const overlappingSegments = allSegments.filter(
-        (segment) =>
-          segment.start < trimPoints.endTime &&
-          segment.end > trimPoints.startTime,
+    // Prefer wider segment list for fullTranscriptionSegments
+    const fullMin = fullTranscriptionSegments.length
+      ? Math.min(...fullTranscriptionSegments.map((s) => s.start))
+      : Infinity;
+    const fullMax = fullTranscriptionSegments.length
+      ? Math.max(...fullTranscriptionSegments.map((s) => s.end))
+      : -Infinity;
+    const allMin =
+      allSegments.length > 0
+        ? Math.min(...allSegments.map((s) => s.start))
+        : Infinity;
+    const allMax =
+      allSegments.length > 0
+        ? Math.max(...allSegments.map((s) => s.end))
+        : -Infinity;
+    if (
+      allSegments.length > 0 &&
+      (allMin < fullMin ||
+        allMax > fullMax ||
+        fullTranscriptionSegments.length === 0)
+    ) {
+      set({ fullTranscriptionSegments: [...allSegments] });
+    }
+
+    const sourceSegments =
+      get().fullTranscriptionSegments.length > 0
+        ? get().fullTranscriptionSegments
+        : allSegments;
+
+    const existingStyle =
+      captions.length > 0
+        ? captions[0].style
+        : {
+            fontSize: 48,
+            fontFamily: "Arial",
+            color: "#FFFFFF",
+            backgroundColor: "rgba(0, 0, 0, 0.7)",
+            textAlign: "center" as const,
+            padding: { top: 10, right: 20, bottom: 10, left: 20 },
+          };
+    const existingPosition =
+      captions.length > 0 ? captions[0].position : { x: 540, y: 1500 };
+
+    const segmentsToCaptions = (
+      segs: SegmentLike[],
+      trim: TrimPoints,
+      idPrefix: string,
+    ): Caption[] =>
+      segs
+        .filter((s) => s.start < trim.endTime && s.end > trim.startTime)
+        .map((segment, index) => ({
+          id: `${idPrefix}-${index}`,
+          text: segment.text,
+          startTime: segment.start,
+          endTime: segment.end,
+          position: { ...existingPosition }, // Deep copy position
+          style: {
+            ...existingStyle,
+            padding: existingStyle.padding
+              ? { ...existingStyle.padding }
+              : undefined,
+            // Deep copy nested objects
+            animation: existingStyle.animation
+              ? { ...existingStyle.animation }
+              : undefined,
+            shadow: existingStyle.shadow
+              ? { ...existingStyle.shadow }
+              : undefined,
+            keywordHighlights: existingStyle.keywordHighlights
+              ? [...existingStyle.keywordHighlights]
+              : undefined,
+          },
+          isVisible: true,
+          language: segment.language || "ar",
+        }));
+
+    if (hasUserEditedTranscription && captions.length > 0) {
+      // Preserve user edits: keep captions overlapping new trim, add source segments only for gaps
+      const kept = captions
+        .filter(
+          (c) =>
+            c.startTime < trimPoints.endTime &&
+            c.endTime > trimPoints.startTime,
+        )
+        .map((c) => ({ ...c, isVisible: true }))
+        .sort((a, b) => a.startTime - b.startTime);
+
+      const gapCaptions: Caption[] = [];
+      const trimStart = trimPoints.startTime;
+      const trimEnd = trimPoints.endTime;
+
+      if (kept.length === 0) {
+        const fromSource = segmentsToCaptions(
+          sourceSegments,
+          trimPoints,
+          `caption-gap-${trimStart.toFixed(1)}`,
+        );
+        gapCaptions.push(...fromSource);
+      } else {
+        const minStart = kept[0].startTime;
+        if (trimStart < minStart && sourceSegments.length > 0) {
+          const gapSegs = sourceSegments.filter(
+            (s) => s.start < minStart && s.end > trimStart,
+          );
+          gapSegs.forEach((seg, i) => {
+            gapCaptions.push({
+              id: `caption-gap-start-${i}`,
+              text: seg.text,
+              startTime: seg.start,
+              endTime: seg.end,
+              position: existingPosition,
+              style: existingStyle,
+              isVisible: true,
+              language: seg.language || "ar",
+            });
+          });
+        }
+        for (let i = 0; i < kept.length - 1; i++) {
+          const endCur = kept[i].endTime;
+          const startNext = kept[i + 1].startTime;
+          if (endCur < startNext - 0.01 && sourceSegments.length > 0) {
+            const gapSegs = sourceSegments.filter(
+              (s) => s.start < startNext && s.end > endCur,
+            );
+            gapSegs.forEach((seg, j) => {
+              gapCaptions.push({
+                id: `caption-gap-mid-${i}-${j}`,
+                text: seg.text,
+                startTime: seg.start,
+                endTime: seg.end,
+                position: existingPosition,
+                style: existingStyle,
+                isVisible: true,
+                language: seg.language || "ar",
+              });
+            });
+          }
+        }
+        const maxEnd = kept[kept.length - 1].endTime;
+        if (maxEnd < trimEnd && sourceSegments.length > 0) {
+          const gapSegs = sourceSegments.filter(
+            (s) => s.start < trimEnd && s.end > maxEnd,
+          );
+          gapSegs.forEach((seg, i) => {
+            gapCaptions.push({
+              id: `caption-gap-end-${i}`,
+              text: seg.text,
+              startTime: seg.start,
+              endTime: seg.end,
+              position: existingPosition,
+              style: existingStyle,
+              isVisible: true,
+              language: seg.language || "ar",
+            });
+          });
+        }
+      }
+
+      const merged = [...kept, ...gapCaptions].sort(
+        (a, b) => a.startTime - b.startTime,
       );
-
-      console.log("[Store] Regenerating captions from full transcription:", {
-        totalAvailableSegments: allSegments.length,
-        overlappingSegments: overlappingSegments.length,
-        newTrimRange: `${trimPoints.startTime.toFixed(2)}s - ${trimPoints.endTime.toFixed(2)}s`,
-        segmentTimeRanges: overlappingSegments
-          .slice(0, 5)
-          .map((s) => `${s.start.toFixed(1)}-${s.end.toFixed(1)}`),
-        segmentTexts: overlappingSegments
-          .slice(0, 3)
-          .map((s) => s.text.substring(0, 40) + "..."),
+      const withIds = merged.map((c, i) => ({
+        ...c,
+        id: `caption-${trimStart.toFixed(1)}-${i}`,
+      }));
+      set({
+        trimPoints: {
+          startTime: trimPoints.startTime,
+          endTime: trimPoints.endTime,
+        },
+        captions: withIds,
       });
+      return;
+    }
 
-      // Use last edited style if available, otherwise try existing captions, otherwise default
-      const { lastEditedCaptionStyle } = get();
-      const defaultStyle = getDefaultCaptionStyle();
-      // Always prefer last edited style - this ensures consistency
-      const styleToApply = lastEditedCaptionStyle || 
-        (captions.length > 0 ? captions[0].style : defaultStyle);
-
-      const existingPosition =
-        captions.length > 0 ? captions[0].position : getDefaultCaptionPosition();
-
-      // Create new captions from overlapping segments
-      // IMPORTANT: Create a deep copy of the style for each caption to avoid reference sharing
+    if (sourceSegments.length > 0) {
+      const overlappingSegments = sourceSegments.filter(
+        (s) => s.start < trimPoints.endTime && s.end > trimPoints.startTime,
+      );
       const newCaptions: Caption[] = overlappingSegments.map(
         (segment, index) => ({
           id: `caption-${trimPoints.startTime.toFixed(1)}-${index}`,
           text: segment.text,
           startTime: segment.start,
           endTime: segment.end,
-          position: { ...existingPosition }, // Deep copy position
-          style: {
-            ...styleToApply,
-            padding: styleToApply.padding ? { ...styleToApply.padding } : undefined,
-            // Deep copy nested objects
-            animation: styleToApply.animation ? { ...styleToApply.animation } : undefined,
-            shadow: styleToApply.shadow ? { ...styleToApply.shadow } : undefined,
-            keywordHighlights: styleToApply.keywordHighlights ? [...styleToApply.keywordHighlights] : undefined,
-          },
+          position: existingPosition,
+          style: existingStyle,
           isVisible: true,
           language: segment.language || "ar",
         }),
       );
-
-      console.log("[Store] Created captions:", {
-        count: newCaptions.length,
-        firstCaption: newCaptions[0]
-          ? {
-              text: newCaptions[0].text.substring(0, 40),
-              start: newCaptions[0].startTime,
-              end: newCaptions[0].endTime,
-            }
-          : null,
-        lastCaption: newCaptions.at(-1)
-          ? {
-              text: newCaptions.at(-1)!.text.substring(0, 40),
-              start: newCaptions.at(-1)!.startTime,
-              end: newCaptions.at(-1)!.endTime,
-            }
-          : null,
-      });
-
-      // Update store with new trim points and captions
-      // Create new object references to ensure React detects changes
       set({
         trimPoints: {
           startTime: trimPoints.startTime,
@@ -466,7 +620,7 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
 
   updateCaptionStyle: (id, style) => {
     const { captions, selectedCaptionId } = get();
-    
+
     // Update the specific caption
     const updatedCaptions = captions.map((caption) =>
       caption.id === id
@@ -491,19 +645,23 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
             ...newStyle,
             // Deep copy nested objects
             padding: newStyle.padding ? { ...newStyle.padding } : undefined,
-            animation: newStyle.animation ? { ...newStyle.animation } : undefined,
+            animation: newStyle.animation
+              ? { ...newStyle.animation }
+              : undefined,
             shadow: newStyle.shadow ? { ...newStyle.shadow } : undefined,
-            keywordHighlights: newStyle.keywordHighlights ? [...newStyle.keywordHighlights] : undefined,
+            keywordHighlights: newStyle.keywordHighlights
+              ? [...newStyle.keywordHighlights]
+              : undefined,
             // Ensure maxWidth and customHeight are applied consistently
             maxWidth: newStyle.maxWidth,
             customHeight: newStyle.customHeight,
           },
         };
       });
-      
+
       // CRITICAL: Preserve selectedCaptionId - don't clear it when updating styles
       // The selected caption should still exist since we're just updating styles, not removing captions
-      set({ 
+      set({
         captions: allUpdatedCaptions,
         lastEditedCaptionStyle: newStyle,
         // Explicitly preserve selectedCaptionId - don't change it
@@ -544,6 +702,64 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
 
   setExportFormat: (format) => {
     set({ exportFormat: format });
+  },
+
+  setIsEditingTranscription: (editing) => {
+    set({ isEditingTranscription: editing });
+  },
+
+  setFullTranscriptionSegments: (segments) => {
+    set({ fullTranscriptionSegments: segments });
+  },
+
+  setHasUserEditedTranscription: (value) => {
+    set({ hasUserEditedTranscription: value });
+  },
+
+  restoreOriginalTranscriptionForCurrentTrim: () => {
+    const { trimPoints, fullTranscriptionSegments, currentClip, captions } =
+      get();
+    const sourceSegments =
+      fullTranscriptionSegments.length > 0
+        ? fullTranscriptionSegments
+        : (currentClip?.transcription?.segments?.map((seg) => ({
+            text: String(seg.text || "").trim(),
+            start: Number(seg.start) || 0,
+            end: Number(seg.end) || 0,
+            language:
+              seg.language ||
+              ((/[\u0600-\u06FF]/.test(String(seg.text)) ? "ar" : "en") as
+                | "ar"
+                | "en"),
+          })) ?? []);
+    if (sourceSegments.length === 0) return;
+    const existingStyle =
+      captions.length > 0
+        ? captions[0].style
+        : {
+            fontSize: 48,
+            fontFamily: "Arial",
+            color: "#FFFFFF",
+            backgroundColor: "rgba(0, 0, 0, 0.7)",
+            textAlign: "center" as const,
+            padding: { top: 10, right: 20, bottom: 10, left: 20 },
+          };
+    const existingPosition =
+      captions.length > 0 ? captions[0].position : { x: 540, y: 1500 };
+    const overlapping = sourceSegments.filter(
+      (s) => s.start < trimPoints.endTime && s.end > trimPoints.startTime,
+    );
+    const newCaptions: Caption[] = overlapping.map((segment, index) => ({
+      id: `caption-restore-${index}`,
+      text: segment.text,
+      startTime: segment.start,
+      endTime: segment.end,
+      position: existingPosition,
+      style: existingStyle,
+      isVisible: true,
+      language: segment.language || "ar",
+    }));
+    set({ captions: newCaptions, hasUserEditedTranscription: false });
   },
 
   reset: () => {

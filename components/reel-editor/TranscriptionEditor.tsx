@@ -12,9 +12,27 @@ export function TranscriptionEditor() {
   const currentClip = useReelEditorStore((state) => state.currentClip);
   const trimStart = useReelEditorStore((state) => state.trimPoints.startTime);
   const trimEnd = useReelEditorStore((state) => state.trimPoints.endTime);
-  const lastEditedCaptionStyle = useReelEditorStore((state) => state.lastEditedCaptionStyle);
   const setCaptions = useReelEditorStore((state) => state.setCaptions);
+  const setIsEditingTranscription = useReelEditorStore(
+    (state) => state.setIsEditingTranscription,
+  );
+  const hasUserEditedTranscription = useReelEditorStore(
+    (state) => state.hasUserEditedTranscription,
+  );
+  const setHasUserEditedTranscription = useReelEditorStore(
+    (state) => state.setHasUserEditedTranscription,
+  );
+  const restoreOriginalTranscriptionForCurrentTrim = useReelEditorStore(
+    (state) => state.restoreOriginalTranscriptionForCurrentTrim,
+  );
   const [isEditing, setIsEditing] = useState(false);
+
+  // Sync store when leaving edit mode or unmounting so other controls stay in sync
+  useEffect(() => {
+    return () => {
+      setIsEditingTranscription(false);
+    };
+  }, [setIsEditingTranscription]);
 
   // Get a key that changes when trim points change (for forcing recalculation)
   const trimKey = useReelEditorStore(
@@ -196,18 +214,18 @@ export function TranscriptionEditor() {
     const totalDuration = trimEnd - trimStart;
     const segmentDuration = totalDuration / Math.max(sentences.length, 1);
 
-    // Use last edited style if available, otherwise try existing captions, otherwise default
-    const defaultStyle = {
-      fontSize: 48,
-      fontFamily: "Arial",
-      color: "#FFFFFF",
-      backgroundColor: "rgba(0, 0, 0, 0.7)",
-      textAlign: "center" as const,
-      padding: { top: 10, right: 20, bottom: 10, left: 20 },
-      maxWidth: 800,
-    };
-    const existingStyle = lastEditedCaptionStyle || 
-      (captions.length > 0 ? captions[0].style : defaultStyle);
+    // Preserve existing caption styles if available
+    const existingStyle =
+      captions.length > 0
+        ? captions[0].style
+        : {
+            fontSize: 48,
+            fontFamily: "Arial",
+            color: "#FFFFFF",
+            backgroundColor: "rgba(0, 0, 0, 0.7)",
+            textAlign: "center" as const,
+            padding: { top: 10, right: 20, bottom: 10, left: 20 },
+          };
 
     const existingPosition =
       captions.length > 0 ? captions[0].position : { x: 540, y: 1500 };
@@ -227,10 +245,18 @@ export function TranscriptionEditor() {
         style: {
           ...existingStyle,
           // Deep copy nested objects
-          padding: existingStyle.padding ? { ...existingStyle.padding } : undefined,
-          animation: existingStyle.animation ? { ...existingStyle.animation } : undefined,
-          shadow: existingStyle.shadow ? { ...existingStyle.shadow } : undefined,
-          keywordHighlights: existingStyle.keywordHighlights ? [...existingStyle.keywordHighlights] : undefined,
+          padding: existingStyle.padding
+            ? { ...existingStyle.padding }
+            : undefined,
+          animation: existingStyle.animation
+            ? { ...existingStyle.animation }
+            : undefined,
+          shadow: existingStyle.shadow
+            ? { ...existingStyle.shadow }
+            : undefined,
+          keywordHighlights: existingStyle.keywordHighlights
+            ? [...existingStyle.keywordHighlights]
+            : undefined,
         },
         isVisible: true,
         language: detectedLanguage, // Use detected language
@@ -238,13 +264,20 @@ export function TranscriptionEditor() {
     });
 
     setCaptions(newCaptions);
+    setHasUserEditedTranscription(true);
     setIsEditing(false);
+    setIsEditingTranscription(false);
+  };
+
+  const handleRestoreOriginal = () => {
+    restoreOriginalTranscriptionForCurrentTrim();
   };
 
   const handleCancel = () => {
     // Restore original text from current transcription
     setEditingText(transcriptionText);
     setIsEditing(false);
+    setIsEditingTranscription(false);
   };
 
   return (
@@ -252,12 +285,26 @@ export function TranscriptionEditor() {
       <div className={styles.header}>
         <h3 className={styles.title}>{t("fullTranscription")}</h3>
         {!isEditing ? (
-          <button
-            onClick={() => setIsEditing(true)}
-            className={styles.editButton}
-          >
-            {t("editText")}
-          </button>
+          <div className={styles.headerButtons}>
+            <button
+              onClick={() => {
+                setIsEditing(true);
+                setIsEditingTranscription(true);
+              }}
+              className={styles.editButton}
+            >
+              {t("editText")}
+            </button>
+            {hasUserEditedTranscription && (
+              <button
+                onClick={handleRestoreOriginal}
+                className={styles.restoreButton}
+                type="button"
+              >
+                {t("restoreOriginal")}
+              </button>
+            )}
+          </div>
         ) : (
           <div className={styles.buttonGroup}>
             <button onClick={handleSave} className={styles.saveButton}>
@@ -269,6 +316,15 @@ export function TranscriptionEditor() {
           </div>
         )}
       </div>
+
+      {isEditing && (
+        <p className={styles.editingHint} role="status" aria-live="polite">
+          <span className={styles.editingHintIcon} aria-hidden>
+            ℹ️
+          </span>
+          {t("editingHint")}
+        </p>
+      )}
 
       <div className={styles.textBoxContainer}>
         {isEditing ? (

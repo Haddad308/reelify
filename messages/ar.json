@@ -11,7 +11,8 @@
     "seconds": "ثانية",
     "home": "الرئيسية",
     "privacyPolicy": "سياسة الخصوصية",
-    "termsAndConditions": "الشروط والأحكام"
+    "termsAndConditions": "الشروط والأحكام",
+    "disabledWhileEditingTranscription": "أتمم تعديل النص أعلاه لتفعيل هذا."
   },
   "home": {
     "title": "اصنع ريلز احترافية",
@@ -145,7 +146,7 @@
     "restoringSession": "جاري استعادة الجلسة...",
     "preparingEditor": "Preparing editor...",
     "loadingEditor": "Loading editor...",
-    "transcription": "النص",
+    "transcription": "النص المفرّغ",
     "defaultTitle": "مقطع فيديو",
     "titleLabel": "تعديل العنوان",
     "titleEditHint": "انقر لتعديل العنوان",
@@ -203,7 +204,7 @@
     "editText": "تعديل النص",
     "save": "حفظ",
     "cancel": "إلغاء",
-    "placeholder": "أدخل النص هنا... (يدعم العربية والإنجليزية)",
+    "placeholder": "أدخل النص المفرّغ هنا... (يدعم العربية والإنجليزية)",
     "noTranscription": "لا يوجد نص متاح. انقر على \"تعديل النص\" لإضافة واحد.",
     "visibleSegments": "مقاطع مرئية",
     "words": "كلمات",
@@ -211,7 +212,9 @@
     "languageEnglish": "الإنجليزية",
     "language": "اللغة",
     "trimRange": "نطاق القص",
-    "emptyError": "لا يمكن أن يكون النص فارغاً"
+    "emptyError": "لا يمكن أن يكون النص فارغاً",
+    "editingHint": "التصدير والتنسيق والقص معطّلة أثناء التعديل. احفظ أو ألغِ لتفعيلها.",
+    "restoreOriginal": "استعادة النص الأصلي"
   },
   "transcriptionLoader": {
     "transcribing": "Transcribing Video...",
