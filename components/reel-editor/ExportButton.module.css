@@ -27,17 +27,17 @@
   );
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   width: 100%;
-  box-shadow: 0 2px 8px -2px rgba(255, 107, 122, 0.2);
+  box-shadow: 0 4px 14px -4px rgba(255, 107, 122, 0.4);
 }
 
 .button:hover:not(:disabled) {
@@ -47,8 +47,8 @@
     hsl(354 100% 60%) 45%,
     hsl(354 72% 50%) 100%
   );
-  box-shadow: 0 10px 40px -10px rgba(255, 107, 122, 0.25);
-  transform: translateY(-1px);
+  box-shadow: 0 8px 25px -5px rgba(255, 107, 122, 0.5);
+  transform: translateY(-2px);
 }
 
 .button:active:not(:disabled) {
@@ -63,7 +63,7 @@
     hsl(354 72% 56%) 100%
   );
   cursor: not-allowed;
-  opacity: 0.8;
+  opacity: 0.6;
   color: white;
 }
 
@@ -112,111 +112,323 @@
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Dropdown styles */
-.dropdownContainer {
-  position: relative;
-  width: 100%;
-  z-index: 1000;
-}
+/* ============================================
+   Export Panel - Modern Modal Design
+   ============================================ */
 
-.dropdownArrow {
-  width: 16px;
-  height: 16px;
-  margin-left: 6px;
-  transition: transform 0.2s, opacity 0.2s;
-  opacity: 0.7;
-  flex-shrink: 0;
-}
-
-.dropdownContainer:hover .dropdownArrow,
-.button:hover .dropdownArrow {
-  opacity: 1;
-}
-
-.dropdownContainer[data-open="true"] .dropdownArrow,
-.button[aria-expanded="true"] .dropdownArrow {
-  transform: rotate(180deg);
-  opacity: 1;
-}
-
-.dropdown {
+.panelOverlay {
   position: fixed;
-  background: hsl(var(--card));
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1),
-    0 2px 4px rgba(0, 0, 0, 0.06);
-  border: 1px solid hsl(var(--border));
-  z-index: 9999;
-  overflow-y: auto;
-  overflow-x: visible;
-  max-height: 400px;
-  animation: dropdownFadeIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  min-width: 200px;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: overlayFadeIn 0.2s ease-out;
 }
 
-@keyframes dropdownFadeIn {
+@keyframes overlayFadeIn {
   from {
     opacity: 0;
-    transform: translateY(-4px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
-.dropdownItem {
+.panel {
+  background: hsl(var(--card));
+  border-radius: 20px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+  border: 1px solid hsl(var(--border));
+  max-width: 420px;
+  width: 90%;
+  max-height: 90vh;
+  overflow: hidden;
+  animation: panelSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes panelSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.panelHeader {
   display: flex;
   align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 10px 14px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.panelHeader h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
   color: hsl(var(--foreground));
-  text-align: left;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  white-space: nowrap;
+  letter-spacing: -0.02em;
 }
 
-.dropdownItem:first-child {
-  border-top-left-radius: 8px;
-  border-top-right-radius: 8px;
-}
-
-.dropdownItem:last-child {
-  border-bottom-left-radius: 8px;
-  border-bottom-right-radius: 8px;
-}
-
-.dropdownItem:hover {
+.closeButton {
   background: hsl(var(--muted));
-}
-
-.dropdownItemSecondary {
+  border: none;
   color: hsl(var(--muted-foreground));
-  font-weight: 400;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
 }
 
-.dropdownItemSecondary:hover {
+.closeButton:hover {
+  background: hsl(var(--muted) / 0.8);
+  color: hsl(var(--foreground));
+  transform: scale(1.05);
+}
+
+.panelContent {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  overflow-y: auto;
+  max-height: calc(90vh - 180px);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sectionLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ============================================
+   Caption Toggle - Pill Style
+   ============================================ */
+
+.captionToggleContainer {
+  display: flex;
+  gap: 8px;
+}
+
+.captionOption {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 16px;
   background: hsl(var(--muted));
-  color: hsl(var(--destructive));
+  border: 2px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
 }
 
-.dropdownIcon {
-  font-size: 16px;
-  width: 24px;
+.captionOption:hover {
+  background: hsl(var(--muted) / 0.7);
+  color: hsl(var(--foreground));
+}
+
+.captionOptionActive {
+  background: hsl(var(--primary) / 0.1);
+  border-color: hsl(var(--primary));
+  color: hsl(var(--primary));
+}
+
+.captionOptionActive:hover {
+  background: hsl(var(--primary) / 0.15);
+}
+
+.checkIcon {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  color: hsl(var(--primary));
+  opacity: 0;
+  transform: scale(0.5);
+  transition: all 0.2s ease;
+}
+
+.captionOptionActive .checkIcon {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.captionIcon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+/* ============================================
+   Platform Grid - Card Selection
+   ============================================ */
+
+.platformGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.platformCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 12px;
+  background: hsl(var(--muted));
+  border: 2px solid transparent;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.platformCard:hover {
+  background: hsl(var(--muted) / 0.7);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px -8px rgba(0, 0, 0, 0.15);
+}
+
+.platformCardSelected {
+  background: hsl(var(--card));
+  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.2);
+  transform: translateY(-2px);
+}
+
+.platformIcon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.platformLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: hsl(var(--foreground));
   text-align: center;
 }
 
-.dropdownDivider {
-  height: 1px;
-  background: hsl(var(--border));
-  margin: 2px 0;
+.connectedBadge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 18px;
+  height: 18px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
 }
+
+.selectedIndicator {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 0 0 12px 12px;
+}
+
+/* Connected Account Info */
+.connectedInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(16, 185, 129, 0.1);
+  border-radius: 12px;
+  color: #10b981;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.disconnectLink {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  transition: color 0.2s;
+}
+
+.disconnectLink:hover {
+  color: hsl(var(--destructive));
+}
+
+/* Panel Footer */
+.panelFooter {
+  padding: 20px 24px;
+  border-top: 1px solid hsl(var(--border));
+  background: hsl(var(--muted) / 0.3);
+}
+
+.exportActionButton {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 24px;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 14px -4px rgba(99, 102, 241, 0.5);
+}
+
+.exportActionButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px -5px rgba(99, 102, 241, 0.6);
+  filter: brightness(1.05);
+}
+
+.exportActionButton:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.actionIcon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+/* ============================================
+   Legacy styles (kept for compatibility)
+   ============================================ */
 
 /* Auth status indicator */
 .authStatus {

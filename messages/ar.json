@@ -230,7 +230,7 @@
     "download": "تحميل",
     "publishTo": "نشر على {platform}",
     "connect": "ربط {platform}",
-    "disconnect": "قطع الاتصال بـ {platform}",
+    "disconnect": "قطع الاتصال",
     "connectedTo": "متصل بـ {platform}",
     "exporting": "جاري التصدير... {progress}%",
     "publishing": "جاري النشر... {progress}%",
@@ -251,7 +251,11 @@
     "facePosition": "موضع الوجه",
     "speaker": "المتحدث",
     "motion": "الحركة",
-    "exportWithSettings": "تصدير بالإعدادات"
+    "exportWithSettings": "تصدير بالإعدادات",
+    "captions": "الترجمات",
+    "withCaptions": "مع الترجمات",
+    "withoutCaptions": "بدون الترجمات",
+    "exportTo": "تصدير إلى"
   },
   "captionCanvas": {
     "safeArea": "Safe Area",

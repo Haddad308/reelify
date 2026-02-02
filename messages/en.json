@@ -230,7 +230,7 @@
     "download": "Download",
     "publishTo": "Publish to {platform}",
     "connect": "Connect {platform}",
-    "disconnect": "Disconnect {platform}",
+    "disconnect": "Disconnect",
     "connectedTo": "Connected to {platform}",
     "exporting": "Exporting... {progress}%",
     "publishing": "Publishing... {progress}%",
@@ -251,7 +251,11 @@
     "facePosition": "Face Position",
     "speaker": "Who's Speaking",
     "motion": "Motion",
-    "exportWithSettings": "Export with Settings"
+    "exportWithSettings": "Export with Settings",
+    "captions": "Captions",
+    "withCaptions": "With Captions",
+    "withoutCaptions": "Without Captions",
+    "exportTo": "Export to"
   },
   "captionCanvas": {
     "safeArea": "Safe Area",

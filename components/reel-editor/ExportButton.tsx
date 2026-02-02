@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
-import { ChevronDown } from "lucide-react";
+import { Download, X, Check } from "lucide-react";
 import { useReelEditorStore } from "@/lib/store/useReelEditorStore";
 import { ReelExportService } from "@/lib/services/ReelExportService";
 import { ReelExportResult, ExportFormatOptions } from "@/types";
@@ -22,17 +22,57 @@ type SelectedPlatform =
   | "youtube"
   | "snapchat"
   | "facebook"
-  | "linkedin";
+  | "linkedin"
+  | "download";
 
 const PUBLISHABLE_PLATFORMS: SelectedPlatform[] = ["youtube", "facebook"];
 
-const PLATFORM_LABELS: Record<SelectedPlatform, string> = {
-  instagram: "Instagram",
-  tiktok: "TikTok",
-  youtube: "YouTube",
-  snapchat: "Snapchat",
-  facebook: "Facebook",
-  linkedin: "LinkedIn",
+const PLATFORM_CONFIG: Record<
+  SelectedPlatform,
+  { label: string; icon: string; color: string; gradient: string }
+> = {
+  download: {
+    label: "Download",
+    icon: "💾",
+    color: "#6366f1",
+    gradient: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+  },
+  instagram: {
+    label: "Instagram",
+    icon: "📸",
+    color: "#E1306C",
+    gradient: "linear-gradient(135deg, #833AB4 0%, #E1306C 50%, #F77737 100%)",
+  },
+  tiktok: {
+    label: "TikTok",
+    icon: "🎵",
+    color: "#000000",
+    gradient: "linear-gradient(135deg, #00f2ea 0%, #ff0050 100%)",
+  },
+  youtube: {
+    label: "YouTube",
+    icon: "▶️",
+    color: "#FF0000",
+    gradient: "linear-gradient(135deg, #FF0000 0%, #CC0000 100%)",
+  },
+  snapchat: {
+    label: "Snapchat",
+    icon: "👻",
+    color: "#FFFC00",
+    gradient: "linear-gradient(135deg, #FFFC00 0%, #FFE600 100%)",
+  },
+  facebook: {
+    label: "Facebook",
+    icon: "📘",
+    color: "#1877F2",
+    gradient: "linear-gradient(135deg, #1877F2 0%, #0d65d9 100%)",
+  },
+  linkedin: {
+    label: "LinkedIn",
+    icon: "💼",
+    color: "#0A66C2",
+    gradient: "linear-gradient(135deg, #0A66C2 0%, #004182 100%)",
+  },
 };
 
 export function ExportButton({
@@ -54,28 +94,21 @@ export function ExportButton({
     isEditingTranscription,
   } = useReelEditorStore();
 
-  const {
-    authStatus,
-    isLoading: isAuthLoading,
-    authenticate,
-    logout,
-  } = useAuthStatus();
+  const { authStatus, authenticate, logout } = useAuthStatus();
 
-  // UI state — export/publish options are independent of CTA platform selection
-  const [showDropdown, setShowDropdown] = useState(false);
+  // UI state
+  const [showPanel, setShowPanel] = useState(false);
+  const [selectedPlatform, setSelectedPlatform] =
+    useState<SelectedPlatform>("download");
+  const [includeCaptions, setIncludeCaptions] = useState(true);
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishProgress, setPublishProgress] = useState(0);
   const [exportedResult, setExportedResult] = useState<ReelExportResult | null>(
     null,
   );
 
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const [dropdownPosition, setDropdownPosition] = useState<{
-    top: number;
-    left: number;
-    width: number;
-  } | null>(null);
   const [mounted, setMounted] = useState(false);
 
   // Set mounted state for portal
@@ -83,77 +116,72 @@ export function ExportButton({
     setMounted(true);
   }, []);
 
-  // Calculate dropdown position when it opens
+  // Close panel when user starts editing transcription
   useEffect(() => {
-    if (showDropdown && buttonRef.current && mounted) {
-      const updatePosition = () => {
-        if (buttonRef.current) {
-          const rect = buttonRef.current.getBoundingClientRect();
-          setDropdownPosition({
-            top: rect.bottom + 8,
-            left: rect.left,
-            width: rect.width,
-          });
-        }
-      };
-
-      updatePosition();
-      globalThis.window.addEventListener("scroll", updatePosition, true);
-      globalThis.window.addEventListener("resize", updatePosition);
-
-      return () => {
-        globalThis.window.removeEventListener("scroll", updatePosition, true);
-        globalThis.window.removeEventListener("resize", updatePosition);
-      };
-    } else {
-      setDropdownPosition(null);
+    if (isEditingTranscription && showPanel) {
+      setShowPanel(false);
     }
-  }, [showDropdown, mounted]);
+  }, [isEditingTranscription, showPanel]);
 
-  // Close dropdown when user starts editing transcription
+  // Close panel when clicking outside
   useEffect(() => {
-    if (isEditingTranscription && showDropdown) {
-      setShowDropdown(false);
-    }
-  }, [isEditingTranscription, showDropdown]);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    if (!showDropdown) return;
+    if (!showPanel) return;
 
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
       if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(target) &&
+        panelRef.current &&
+        !panelRef.current.contains(target) &&
         buttonRef.current &&
         !buttonRef.current.contains(target)
       ) {
-        setShowDropdown(false);
+        setShowPanel(false);
       }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showDropdown]);
+  }, [showPanel]);
+
+  // Close on escape key
+  useEffect(() => {
+    if (!showPanel) return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowPanel(false);
+      }
+    };
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [showPanel]);
 
   // Auth helpers per publishable platform (user can export/publish to any platform)
-  const isAuthenticatedFor = (p: (typeof PUBLISHABLE_PLATFORMS)[number]) =>
-    p === "youtube" ? authStatus.youtube : authStatus.facebook;
+  const isAuthenticatedFor = (p: SelectedPlatform) => {
+    if (p === "youtube") return authStatus.youtube;
+    if (p === "facebook") return authStatus.facebook;
+    return false;
+  };
 
   // Check if any captions have animations
   const hasAnimations = captions.some(
     (c) => c.style.animation && c.style.animation.type !== "none",
   );
 
+  // Check if captions exist
+  const hasCaptions = captions.length > 0;
+
   /**
    * Export video and return the result
    */
-  const handleExport = async (): Promise<ReelExportResult | null> => {
+  const handleExport = async (
+    withCaptions: boolean = true,
+  ): Promise<ReelExportResult | null> => {
     if (!currentClip || isExporting) return null;
 
-    // Warn about animations if present
-    if (hasAnimations) {
+    // Warn about animations if present and captions are included
+    if (withCaptions && hasAnimations) {
       const confirmed = window.confirm(t("animationConfirm"));
       if (!confirmed) return null;
     }
@@ -172,10 +200,17 @@ export function ExportButton({
         },
       };
 
+      // Filter captions based on user choice
+      const captionsToExport = withCaptions
+        ? captions.filter((c) => c.isVisible)
+        : [];
+
       // Log caption state before export
       console.log("[ExportButton] Caption state before export:", {
         totalCaptions: captions.length,
         visibleCaptions: captions.filter((c) => c.isVisible).length,
+        exportingWithCaptions: withCaptions,
+        captionsToExport: captionsToExport.length,
         trimRange: `${trimPoints.startTime.toFixed(
           2,
         )} - ${trimPoints.endTime.toFixed(2)}`,
@@ -195,7 +230,7 @@ export function ExportButton({
         currentClip.videoSourceUrl,
         trimPoints.startTime,
         trimPoints.endTime,
-        captions.filter((c) => c.isVisible),
+        captionsToExport,
         currentClip.clipId,
         quality,
         (progress) => setExportProgress(progress),
@@ -221,20 +256,43 @@ export function ExportButton({
    * Handle download action
    */
   const handleDownload = async () => {
-    setShowDropdown(false);
-    const result = await handleExport();
+    setShowPanel(false);
+    const result = await handleExport(includeCaptions);
     if (result) {
       onExportSuccess?.(result);
     }
   };
 
   /**
+   * Handle the main export/publish action based on selected platform
+   */
+  const handleExportAction = async () => {
+    if (selectedPlatform === "download") {
+      await handleDownload();
+      return;
+    }
+
+    // For social platforms, publish
+    await handlePublish(selectedPlatform);
+  };
+
+  /**
    * Handle publish action for a specific platform (user chooses at export time)
    */
-  const handlePublish = async (
-    targetPlatform: (typeof PUBLISHABLE_PLATFORMS)[number],
-  ) => {
-    setShowDropdown(false);
+  const handlePublish = async (targetPlatform: SelectedPlatform) => {
+    if (targetPlatform === "download") {
+      await handleDownload();
+      return;
+    }
+
+    // Check if this platform supports publishing
+    if (!PUBLISHABLE_PLATFORMS.includes(targetPlatform)) {
+      // For non-publishable platforms, just download
+      await handleDownload();
+      return;
+    }
+
+    setShowPanel(false);
 
     // Check if authenticated for this platform
     if (!isAuthenticatedFor(targetPlatform)) {
@@ -245,7 +303,7 @@ export function ExportButton({
     // Export first if not already exported
     let result = exportedResult;
     if (!result) {
-      result = await handleExport();
+      result = await handleExport(includeCaptions);
       if (!result) return;
     }
 
@@ -288,7 +346,7 @@ export function ExportButton({
 
       setPublishProgress(100);
 
-      const platformLabel = PLATFORM_LABELS[targetPlatform];
+      const platformLabel = PLATFORM_CONFIG[targetPlatform].label;
       const postUrl = data.videoUrl || data.postUrl;
 
       alert(t("publishSuccess", { platform: platformLabel, url: postUrl }));
@@ -311,11 +369,9 @@ export function ExportButton({
   /**
    * Handle logout for a specific platform
    */
-  const handleLogout = async (
-    targetPlatform: (typeof PUBLISHABLE_PLATFORMS)[number],
-  ) => {
+  const handleLogout = async (targetPlatform: SelectedPlatform) => {
+    if (targetPlatform === "download") return;
     await logout(targetPlatform as Platform);
-    setShowDropdown(false);
   };
 
   // Determine button state
@@ -327,109 +383,214 @@ export function ExportButton({
     ? t("publishing", { progress: publishProgress })
     : null;
 
-  // Always show dropdown: Download + Publish to any supported platform (independent of CTA selection)
+  // Available platforms to show in the grid
+  const availablePlatforms: SelectedPlatform[] = [
+    "download",
+    "youtube",
+    "facebook",
+  ];
+
+  // Get the action button text based on selected platform
+  const getActionButtonText = () => {
+    if (selectedPlatform === "download") {
+      return t("download");
+    }
+    const isAuth = isAuthenticatedFor(selectedPlatform);
+    const label = PLATFORM_CONFIG[selectedPlatform].label;
+    return isAuth
+      ? t("publishTo", { platform: label })
+      : t("connect", { platform: label });
+  };
+
   return (
-    <div className={styles.container} ref={dropdownRef}>
-      {hasAnimations && !isProcessing && (
+    <div className={styles.container}>
+      {hasAnimations && !isProcessing && includeCaptions && (
         <div className={styles.warning}>{t("animationWarning")}</div>
       )}
 
-      <div className={styles.dropdownContainer}>
-        <button
-          ref={buttonRef}
-          onClick={() => setShowDropdown(!showDropdown)}
-          disabled={!currentClip || isProcessing || isEditingTranscription}
-          className={styles.button}
-          aria-expanded={showDropdown}
-          title={
-            isEditingTranscription
-              ? tCommon("disabledWhileEditingTranscription")
-              : undefined
-          }
-        >
-          {isProcessing ? (
-            <>
-              <span className={styles.spinner} />
-              {statusText}
-            </>
-          ) : (
-            <>
-              {t("exportReel")}
-              <ChevronDown className={styles.dropdownArrow} />
-            </>
-          )}
-        </button>
+      {/* Main Export Button */}
+      <button
+        ref={buttonRef}
+        onClick={() => setShowPanel(!showPanel)}
+        disabled={!currentClip || isProcessing || isEditingTranscription}
+        className={styles.button}
+        aria-expanded={showPanel}
+        title={
+          isEditingTranscription
+            ? tCommon("disabledWhileEditingTranscription")
+            : undefined
+        }
+      >
+        {isProcessing ? (
+          <>
+            <span className={styles.spinner} />
+            {statusText}
+          </>
+        ) : (
+          <>
+            <Download size={18} />
+            {t("exportReel")}
+          </>
+        )}
+      </button>
 
-        {showDropdown &&
-          !isProcessing &&
-          !isEditingTranscription &&
-          dropdownPosition &&
-          mounted &&
-          typeof document !== "undefined" &&
-          document.body &&
-          createPortal(
+      {/* Export Panel Modal */}
+      {showPanel &&
+        !isProcessing &&
+        !isEditingTranscription &&
+        mounted &&
+        typeof document !== "undefined" &&
+        document.body &&
+        createPortal(
+          <div className={styles.panelOverlay} onClick={() => setShowPanel(false)}>
             <div
-              ref={dropdownRef}
-              className={styles.dropdown}
-              style={{
-                top: `${dropdownPosition.top}px`,
-                left: `${dropdownPosition.left}px`,
-                width: `${dropdownPosition.width}px`,
-              }}
+              ref={panelRef}
+              className={styles.panel}
+              onClick={(e) => e.stopPropagation()}
             >
-              <button className={styles.dropdownItem} onClick={handleDownload}>
-                <span className={styles.dropdownIcon}>⬇️</span>
-                {t("download")}
-              </button>
+              {/* Panel Header */}
+              <div className={styles.panelHeader}>
+                <h3>{t("exportSettings")}</h3>
+                <button
+                  className={styles.closeButton}
+                  onClick={() => setShowPanel(false)}
+                  aria-label="Close"
+                >
+                  <X size={20} />
+                </button>
+              </div>
 
-              {PUBLISHABLE_PLATFORMS.map((p) => {
-                const label = PLATFORM_LABELS[p];
-                const isAuth = isAuthenticatedFor(p);
-                return (
-                  <React.Fragment key={p}>
-                    <div className={styles.dropdownDivider} />
-                    <button
-                      className={styles.dropdownItem}
-                      onClick={() => handlePublish(p)}
-                    >
-                      <span className={styles.dropdownIcon}>
-                        {p === "youtube" ? "🎬" : "📘"}
-                      </span>
-                      {isAuth
-                        ? t("publishTo", { platform: label })
-                        : t("connect", { platform: label })}
-                    </button>
-                    {isAuth && (
+              {/* Panel Content */}
+              <div className={styles.panelContent}>
+                {/* Caption Toggle Section */}
+                {hasCaptions && (
+                  <div className={styles.section}>
+                    <div className={styles.sectionLabel}>{t("captions") || "Captions"}</div>
+                    <div className={styles.captionToggleContainer}>
                       <button
-                        className={`${styles.dropdownItem} ${styles.dropdownItemSecondary}`}
-                        onClick={() => handleLogout(p)}
+                        className={`${styles.captionOption} ${
+                          includeCaptions ? styles.captionOptionActive : ""
+                        }`}
+                        onClick={() => setIncludeCaptions(true)}
                       >
-                        <span className={styles.dropdownIcon}>🚪</span>
-                        {t("disconnect", { platform: label })}
+                        <span className={styles.captionIcon}>💬</span>
+                        <span>{t("withCaptions") || "With Captions"}</span>
+                        {includeCaptions && (
+                          <Check size={16} className={styles.checkIcon} />
+                        )}
                       </button>
-                    )}
-                  </React.Fragment>
-                );
-              })}
-            </div>,
-            document.body,
-          )}
-      </div>
+                      <button
+                        className={`${styles.captionOption} ${
+                          !includeCaptions ? styles.captionOptionActive : ""
+                        }`}
+                        onClick={() => setIncludeCaptions(false)}
+                      >
+                        <span className={styles.captionIcon}>🔇</span>
+                        <span>{t("withoutCaptions") || "Without Captions"}</span>
+                        {!includeCaptions && (
+                          <Check size={16} className={styles.checkIcon} />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
 
-      {/* Auth status: show which platforms are connected */}
-      {!isAuthLoading && (authStatus.youtube || authStatus.facebook) && (
-        <div className={styles.authStatus}>
-          ✓{" "}
-          {[
-            authStatus.youtube && PLATFORM_LABELS.youtube,
-            authStatus.facebook && PLATFORM_LABELS.facebook,
-          ]
-            .filter((n): n is string => Boolean(n))
-            .map((name) => t("connectedTo", { platform: name }))
-            .join(" · ")}
-        </div>
-      )}
+                {/* Platform Selection Section */}
+                <div className={styles.section}>
+                  <div className={styles.sectionLabel}>
+                    {t("exportTo") || "Export to"}
+                  </div>
+                  <div className={styles.platformGrid}>
+                    {availablePlatforms.map((platform) => {
+                      const config = PLATFORM_CONFIG[platform];
+                      const isSelected = selectedPlatform === platform;
+                      const isAuth =
+                        platform === "download" || isAuthenticatedFor(platform);
+                      const isPublishable = PUBLISHABLE_PLATFORMS.includes(platform);
 
+                      return (
+                        <button
+                          key={platform}
+                          className={`${styles.platformCard} ${
+                            isSelected ? styles.platformCardSelected : ""
+                          }`}
+                          onClick={() => setSelectedPlatform(platform)}
+                          style={
+                            isSelected
+                              ? { borderColor: config.color }
+                              : undefined
+                          }
+                        >
+                          <span className={styles.platformIcon}>
+                            {config.icon}
+                          </span>
+                          <span className={styles.platformLabel}>
+                            {config.label}
+                          </span>
+                          {isPublishable && isAuth && (
+                            <span className={styles.connectedBadge}>
+                              <Check size={12} />
+                            </span>
+                          )}
+                          {isSelected && (
+                            <span
+                              className={styles.selectedIndicator}
+                              style={{ background: config.gradient }}
+                            />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Connected Account Info */}
+                {selectedPlatform !== "download" &&
+                  isAuthenticatedFor(selectedPlatform) && (
+                    <div className={styles.connectedInfo}>
+                      <Check size={14} />
+                      <span>
+                        {t("connectedTo", {
+                          platform: PLATFORM_CONFIG[selectedPlatform].label,
+                        })}
+                      </span>
+                      <button
+                        className={styles.disconnectLink}
+                        onClick={() => handleLogout(selectedPlatform)}
+                      >
+                        {t("disconnect", {
+                          platform: "",
+                        }).trim()}
+                      </button>
+                    </div>
+                  )}
+              </div>
+
+              {/* Panel Footer */}
+              <div className={styles.panelFooter}>
+                <button
+                  className={styles.exportActionButton}
+                  onClick={handleExportAction}
+                  style={{
+                    background: PLATFORM_CONFIG[selectedPlatform].gradient,
+                  }}
+                >
+                  {selectedPlatform === "download" ? (
+                    <Download size={18} />
+                  ) : (
+                    <span className={styles.actionIcon}>
+                      {PLATFORM_CONFIG[selectedPlatform].icon}
+                    </span>
+                  )}
+                  {getActionButtonText()}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {/* Progress Bar */}
       {isProcessing && (
         <div className={styles.progressBar}>
           <div
