@@ -206,8 +206,8 @@ export class ReelCaptionRenderer {
     const maxTextWidth = style.maxWidth
       ? style.maxWidth - padding.left - padding.right
       : videoWidth
-        ? videoWidth * 0.8 - padding.left - padding.right
-        : 800; // Fallback width
+      ? videoWidth * 0.8 - padding.left - padding.right
+      : 800; // Fallback width
 
     // Wrap text into multiple lines
     const lines = this.wrapText(ctx, text, maxTextWidth);
@@ -302,20 +302,42 @@ export class ReelCaptionRenderer {
    */
   private static wrapSegments(
     ctx: CanvasRenderingContext2D,
-    segments: Array<{ text: string; isKeyword: boolean; fontWeight?: string }>,
+    segments: Array<{
+      text: string;
+      isKeyword: boolean;
+      fontWeight?: string;
+      color?: string;
+      backgroundColor?: string;
+    }>,
     maxWidth: number,
     fontStyle: string,
     fontWeight: string,
     fontSize: number,
     fontFamily: string,
-  ): Array<Array<{ text: string; isKeyword: boolean; fontWeight?: string }>> {
+  ): Array<
+    Array<{
+      text: string;
+      isKeyword: boolean;
+      fontWeight?: string;
+      color?: string;
+      backgroundColor?: string;
+    }>
+  > {
     const lines: Array<
-      Array<{ text: string; isKeyword: boolean; fontWeight?: string }>
+      Array<{
+        text: string;
+        isKeyword: boolean;
+        fontWeight?: string;
+        color?: string;
+        backgroundColor?: string;
+      }>
     > = [];
     let currentLine: Array<{
       text: string;
       isKeyword: boolean;
       fontWeight?: string;
+      color?: string;
+      backgroundColor?: string;
     }> = [];
     let currentLineWidth = 0;
 
@@ -372,8 +394,8 @@ export class ReelCaptionRenderer {
     const maxTextWidth = style.maxWidth
       ? style.maxWidth - padding.left - padding.right
       : videoWidth
-        ? videoWidth * 0.8 - padding.left - padding.right
-        : 800; // Fallback width
+      ? videoWidth * 0.8 - padding.left - padding.right
+      : 800; // Fallback width
 
     // Wrap segments into multiple lines
     const wrappedLines = this.wrapSegments(

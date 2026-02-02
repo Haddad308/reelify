@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import Moveable from "moveable";
 import { useCaptionRenderer } from "@/lib/hooks/useCaptionRenderer";
 import { useReelEditorStore } from "@/lib/store/useReelEditorStore";
-import { DEFAULT_SAFE_AREAS } from "@/types";
+import { DEFAULT_SAFE_AREAS, type Caption } from "@/types";
 import styles from "./CaptionCanvas.module.css";
 
 interface CaptionCanvasProps {
@@ -42,7 +42,10 @@ export function CaptionCanvas({
   const isDraggingRef = useRef(false);
   const isResizingRef = useRef(false);
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const fixedPositionDuringResizeRef = useRef<{ left: string; top: string } | null>(null);
+  const fixedPositionDuringResizeRef = useRef<{
+    left: string;
+    top: string;
+  } | null>(null);
   const lastClickTimeRef = useRef<number>(0);
   const isDoubleClickRef = useRef<boolean>(false);
 
@@ -276,6 +279,11 @@ export function CaptionCanvas({
       // CRITICAL: If a caption is selected, check IMMEDIATELY if click is within its bounds
       // This must happen BEFORE deselecting to prevent the caption from disappearing
       if (selectedCaption) {
+        // Store selected caption in a const to avoid TypeScript narrowing issues
+        // Type assertion needed because TypeScript has trouble with narrowing in callbacks
+        const currentSelectedCaption: Caption = selectedCaption;
+        const currentSelectedCaptionId = currentSelectedCaption.id;
+
         // First check: if click is on the moveable target element itself (fastest check)
         if (targetRef.current) {
           const moveableTarget = targetRef.current;
@@ -301,7 +309,7 @@ export function CaptionCanvas({
         }
 
         // Third check: if we found a caption at click position AND it's the selected one
-        if (clickedCaption && clickedCaption.id === selectedCaption.id) {
+        if (clickedCaption && clickedCaption.id === currentSelectedCaptionId) {
           // Click is on the selected caption, don't deselect
           e.stopPropagation();
           e.preventDefault();
@@ -309,7 +317,7 @@ export function CaptionCanvas({
         }
 
         // Fourth check: use caption bounds calculation for selected caption (most accurate)
-        if (isClickWithinCaptionBounds(selectedCaption)) {
+        if (isClickWithinCaptionBounds(currentSelectedCaption)) {
           // Click is on the selected caption, don't deselect
           e.stopPropagation();
           e.preventDefault();
@@ -346,8 +354,8 @@ export function CaptionCanvas({
             clickX: x,
             clickY: y,
             selectedCaptionPos: {
-              x: selectedCaption.position.x,
-              y: selectedCaption.position.y,
+              x: currentSelectedCaption.position.x,
+              y: currentSelectedCaption.position.y,
             },
             isDragging: isDraggingRef.current,
             isResizing: isResizingRef.current,
@@ -386,7 +394,8 @@ export function CaptionCanvas({
         // Aggressively cleanup drag handle before deselecting
         // Check both targetRef and container directly to ensure cleanup
         if (targetRef.current) {
-          const dragHandle = (targetRef.current as any)?._dragHandle as HTMLDivElement;
+          const dragHandle = (targetRef.current as any)
+            ?._dragHandle as HTMLDivElement;
           if (dragHandle) {
             try {
               if (dragHandle.parentNode) {
@@ -394,24 +403,32 @@ export function CaptionCanvas({
               }
               delete (targetRef.current as any)._dragHandle;
             } catch (error) {
-              console.warn("[CaptionCanvas] Error removing drag handle on ESC:", error);
+              console.warn(
+                "[CaptionCanvas] Error removing drag handle on ESC:",
+                error,
+              );
             }
           }
         }
-        
+
         // Also check container directly for any drag handles (fallback)
         if (containerRef.current) {
           // Use data attribute for more reliable selection
-          const dragHandles = containerRef.current.querySelectorAll('[data-drag-handle="true"]');
+          const dragHandles = containerRef.current.querySelectorAll(
+            '[data-drag-handle="true"]',
+          );
           dragHandles.forEach((handle) => {
             try {
               handle.remove();
             } catch (error) {
-              console.warn("[CaptionCanvas] Error removing drag handle from container:", error);
+              console.warn(
+                "[CaptionCanvas] Error removing drag handle from container:",
+                error,
+              );
             }
           });
         }
-        
+
         setSelectedCaptionId(null);
       }
     };
@@ -649,7 +666,7 @@ export function CaptionCanvas({
           target.style.left = `${expectedLeft}px`;
           target.style.top = `${expectedTop}px`;
           target.style.width = `${targetWidth}px`;
-          
+
           // Only update height if we should
           if (shouldUpdateHeight) {
             target.style.height = `${targetHeight}px`;
@@ -682,7 +699,11 @@ export function CaptionCanvas({
           requestAnimationFrame(() => {
             requestAnimationFrame(() => {
               // Double-check flags after animation frames to avoid race conditions
-              if (moveableRef.current && !isResizingRef.current && !isDraggingRef.current) {
+              if (
+                moveableRef.current &&
+                !isResizingRef.current &&
+                !isDraggingRef.current
+              ) {
                 moveableRef.current.updateRect();
               }
             });
@@ -706,7 +727,9 @@ export function CaptionCanvas({
   useEffect(() => {
     if (!selectedCaption || !containerRef.current) {
       // Disable pointer events on container when no caption selected
-      containerRef.current.style.pointerEvents = "none";
+      if (containerRef.current) {
+        containerRef.current.style.pointerEvents = "none";
+      }
 
       // Canvas pointer events will be re-enabled via inline style when selectedCaption is null
       // Cleanup existing Moveable instance
@@ -720,8 +743,13 @@ export function CaptionCanvas({
       }
       // Cleanup drag handle first (it's appended to container, not target)
       if (targetRef.current) {
-        const dragHandle = (targetRef.current as any)?._dragHandle as HTMLDivElement;
-        if (dragHandle && containerRef.current && containerRef.current.contains(dragHandle)) {
+        const dragHandle = (targetRef.current as any)
+          ?._dragHandle as HTMLDivElement;
+        if (
+          dragHandle &&
+          containerRef.current &&
+          containerRef.current.contains(dragHandle)
+        ) {
           try {
             dragHandle.remove();
             delete (targetRef.current as any)._dragHandle;
@@ -730,7 +758,7 @@ export function CaptionCanvas({
           }
         }
       }
-      
+
       // Cleanup target element
       if (
         targetRef.current &&
@@ -796,8 +824,8 @@ export function CaptionCanvas({
     const maxWidth = selectedCaption.style.maxWidth
       ? selectedCaption.style.maxWidth
       : videoWidth
-        ? videoWidth * 0.8
-        : 800;
+      ? videoWidth * 0.8
+      : 800;
 
     // Use the actual canvas context for measurement to match renderer exactly
     const ctx = canvas.getContext("2d");
@@ -989,7 +1017,7 @@ export function CaptionCanvas({
       container.appendChild(dragHandle);
       (target as any)._dragHandle = dragHandle;
     }
-    
+
     // Position drag handle in top-right corner
     const handleSize = 16; // Larger size for better visibility
     dragHandle.style.left = `${targetLeft + targetWidth}px`; // Right edge of target
@@ -1215,7 +1243,8 @@ export function CaptionCanvas({
         const dragHandle = (target as any)?._dragHandle as HTMLDivElement;
         if (dragHandle) {
           const handleSize = Number.parseFloat(dragHandle.style.width) || 10;
-          const targetWidth = width || Number.parseFloat(target.style.width) || 0;
+          const targetWidth =
+            width || Number.parseFloat(target.style.width) || 0;
           // Use left/top from event (which accounts for transform) instead of getBoundingClientRect
           dragHandle.style.transform = "none"; // Don't use transform, use absolute positioning
           dragHandle.style.left = `${left + targetWidth}px`; // Align with right edge
@@ -1227,15 +1256,16 @@ export function CaptionCanvas({
       });
 
       moveable.on("dragEnd", (e) => {
+        const lastEvent = e.lastEvent as any;
         console.log("[CaptionCanvas] Drag ended", {
-          left: e.left,
-          top: e.top,
+          left: lastEvent?.left,
+          top: lastEvent?.top,
           lastEvent: e.lastEvent,
         });
 
         if (!selectedCaption || !container || !target || !canvas) return;
 
-        const { left, top } = e.lastEvent || e;
+        const { left, top } = lastEvent || {};
 
         // Update actual left/top position after drag completes
         target.style.left = `${left}px`;
@@ -1287,7 +1317,11 @@ export function CaptionCanvas({
         // Final update to ensure position is correct
         // Use a delay to ensure resize/drag flags are cleared first
         setTimeout(() => {
-          if (moveableRef.current && !isResizingRef.current && !isDraggingRef.current) {
+          if (
+            moveableRef.current &&
+            !isResizingRef.current &&
+            !isDraggingRef.current
+          ) {
             moveableRef.current.updateRect();
           }
         }, 100);
@@ -1305,26 +1339,26 @@ export function CaptionCanvas({
         // Set flag IMMEDIATELY at the very start to prevent any external updates
         // This must happen synchronously, before any other code runs
         isResizingRef.current = true;
-        
+
         // Store the CURRENT position from getBoundingClientRect to get actual rendered position
         // This accounts for any transforms that might be applied
         const targetRect = target.getBoundingClientRect();
         const containerRect = container.getBoundingClientRect();
         const actualLeft = targetRect.left - containerRect.left;
         const actualTop = targetRect.top - containerRect.top;
-        
+
         // Store the fixed position to prevent any changes during resize
         // Use the actual rendered position, not the style value
         fixedPositionDuringResizeRef.current = {
           left: `${actualLeft}px`,
           top: `${actualTop}px`,
         };
-        
+
         // Also update the style to ensure it matches the actual position
         target.style.left = `${actualLeft}px`;
         target.style.top = `${actualTop}px`;
         target.style.transform = "none"; // Clear any transform before resize
-        
+
         // Prevent any position updates that might be queued
         // The external update effect checks this flag, so setting it here prevents jumps
       });
@@ -1333,8 +1367,10 @@ export function CaptionCanvas({
         if (!selectedCaption || !target || !canvas || !container) return;
         // Only update if actively resizing (not just hovering)
         if (!isResizingRef.current) return;
-        
-        const { width, height, transform, drag, left, top, direction } = e;
+
+        const eventData = e as any;
+        const { width, height, transform, drag, left, top, direction } =
+          eventData;
 
         console.log("[CaptionCanvas] Resizing", {
           width,
@@ -1348,15 +1384,15 @@ export function CaptionCanvas({
         // Apply size and transform - ALLOW BOTH width and height to change
         // CRITICAL: Only update width/height, NOT left/top - Moveable handles position via transform
         // CRITICAL: Keep left/top FIXED during resize to prevent resize handles from jumping
-        
+
         // Store current position before any updates
         const currentLeft = target.style.left;
         const currentTop = target.style.top;
-        
+
         target.style.width = `${width}px`;
         target.style.height = `${height}px`;
         target.style.transform = transform || "none";
-        
+
         // CRITICAL: ALWAYS restore the fixed position IMMEDIATELY after updating size/transform
         // This must happen synchronously to prevent any jumps
         // Use the stored fixed position from resizeStart, or fallback to current if not set
@@ -1366,7 +1402,7 @@ export function CaptionCanvas({
         };
         target.style.left = fixedPos.left;
         target.style.top = fixedPos.top;
-        
+
         // Double-check: if position was changed by something else, restore it again
         // This ensures position stays fixed even if external code tries to change it
         if (target.style.left !== fixedPos.left) {
@@ -1375,7 +1411,7 @@ export function CaptionCanvas({
         if (target.style.top !== fixedPos.top) {
           target.style.top = fixedPos.top;
         }
-        
+
         // DO NOT update target.style.left or target.style.top here - it causes jumps
         // Moveable uses transform to position during resize, and we'll update left/top in resizeEnd
 
@@ -1387,11 +1423,13 @@ export function CaptionCanvas({
       });
 
       moveable.on("resizeEnd", (e) => {
+        const eventData = e as any;
+        const lastEvent = e.lastEvent as any;
         console.log("[CaptionCanvas] Resize ended", {
-          width: e.width,
-          height: e.height,
+          width: eventData?.width,
+          height: eventData?.height,
           lastEvent: e.lastEvent,
-          direction: e.direction,
+          direction: eventData?.direction,
         });
 
         if (!selectedCaption || !container || !target || !canvas) return;
@@ -1402,7 +1440,7 @@ export function CaptionCanvas({
         const height = targetRect.height;
 
         // Get position from drag or calculate from current position
-        const drag = e.lastEvent?.drag || e.drag;
+        const drag = lastEvent?.drag || eventData?.drag;
         const left =
           drag?.left !== undefined
             ? drag.left
@@ -1480,7 +1518,7 @@ export function CaptionCanvas({
 
         // Clear the fixed position reference
         fixedPositionDuringResizeRef.current = null;
-        
+
         // Delay resetting the flag to give state updates time to propagate
         // Use longer timeout to ensure state updates complete (1 second to be safe)
         resizeTimeoutRef.current = setTimeout(() => {
@@ -1527,10 +1565,11 @@ export function CaptionCanvas({
         }
         moveableRef.current = null;
       }
-      
+
       // Cleanup drag handle first (before target cleanup)
       if (targetRef.current) {
-        const dragHandle = (targetRef.current as any)?._dragHandle as HTMLDivElement;
+        const dragHandle = (targetRef.current as any)
+          ?._dragHandle as HTMLDivElement;
         if (dragHandle) {
           try {
             if (dragHandle.parentNode) {
@@ -1538,24 +1577,32 @@ export function CaptionCanvas({
             }
             delete (targetRef.current as any)._dragHandle;
           } catch (error) {
-            console.warn("[CaptionCanvas] Error removing drag handle in cleanup:", error);
+            console.warn(
+              "[CaptionCanvas] Error removing drag handle in cleanup:",
+              error,
+            );
           }
         }
       }
-      
+
       // Also check container directly for any drag handles (fallback)
       if (containerRef.current) {
         // Use data attribute for more reliable selection
-        const dragHandles = containerRef.current.querySelectorAll('[data-drag-handle="true"]');
+        const dragHandles = containerRef.current.querySelectorAll(
+          '[data-drag-handle="true"]',
+        );
         dragHandles.forEach((handle) => {
           try {
             handle.remove();
           } catch (error) {
-            console.warn("[CaptionCanvas] Error removing drag handle from container in cleanup:", error);
+            console.warn(
+              "[CaptionCanvas] Error removing drag handle from container in cleanup:",
+              error,
+            );
           }
         });
       }
-      
+
       // Cleanup target element
       if (
         targetRef.current &&
