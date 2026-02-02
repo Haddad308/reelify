@@ -42,8 +42,12 @@ const FONT_WEIGHTS = [
 
 export function CaptionStyleEditor() {
   const t = useTranslations("captionStyleEditor");
-  const { captions, selectedCaptionId, updateCaptionStyle } =
-    useReelEditorStore();
+  const {
+    captions,
+    selectedCaptionId,
+    updateCaptionStyle,
+    setSelectedCaptionId,
+  } = useReelEditorStore();
 
   const selectedCaption = captions.find((c) => c.id === selectedCaptionId);
   const style = selectedCaption?.style;
@@ -59,6 +63,23 @@ export function CaptionStyleEditor() {
       setLocalStyle(style);
     }
   }, [selectedCaptionId, style, selectedCaption]);
+
+  // Handle ESC key to exit edit mode
+  useEffect(() => {
+    if (!selectedCaptionId) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && selectedCaptionId) {
+        e.preventDefault();
+        setSelectedCaptionId(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [selectedCaptionId, setSelectedCaptionId]);
 
   if (!selectedCaption) {
     return (
@@ -98,7 +119,17 @@ export function CaptionStyleEditor() {
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <h3 className={styles.title}>{t("captionStyle")}</h3>
+      <div className={styles.header}>
+        <h3 className={styles.title}>{t("captionStyle")}</h3>
+        {selectedCaption && (
+          <div className={styles.exitHint} role="status" aria-live="polite">
+            <span className={styles.exitHintIcon} aria-hidden>
+              ⌨️
+            </span>
+            <span>{t("pressEscToExit")}</span>
+          </div>
+        )}
+      </div>
 
       {/* Text Styling Section */}
       <div className={styles.section}>

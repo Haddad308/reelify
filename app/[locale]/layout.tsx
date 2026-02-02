@@ -50,8 +50,19 @@ export async function generateMetadata({
       follow: true,
     },
     icons: {
-      icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
-      shortcut: "/favicon.svg",
+      icon: [
+        { url: "/favicon.ico", sizes: "any" },
+        { url: "/favicon.svg", type: "image/svg+xml" },
+        { url: "/favicon-96x96.png", type: "image/png", sizes: "96x96" },
+      ],
+      shortcut: "/favicon.ico",
+      apple: [
+        { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+      ],
+      other: [
+        { rel: "icon", url: "/web-app-manifest-192x192.png", sizes: "192x192", type: "image/png" },
+        { rel: "icon", url: "/web-app-manifest-512x512.png", sizes: "512x512", type: "image/png" },
+      ],
     },
     manifest: "/site.webmanifest",
     openGraph: {
