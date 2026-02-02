@@ -1,40 +1,99 @@
-'use client';
+"use client";
 
-import React, { useEffect, useState } from 'react';
-import { useTranslations } from 'next-intl';
-import { ReelEditorProps } from '@/types';
-import { useReelEditorStore } from '@/lib/store/useReelEditorStore';
-import { ReelClipDataProcessor } from '@/lib/services/ReelClipDataProcessor';
-import { ElevenLabsService } from '@/lib/services/ElevenLabsService';
-import { VideoPlayer } from './VideoPlayer';
-import { CaptionCanvas } from './CaptionCanvas';
-import { Timeline } from './Timeline';
-import { TranscriptionLoader } from './TranscriptionLoader';
-import { TranscriptionEditor } from './TranscriptionEditor';
-import { ExportButton } from './ExportButton';
-import styles from './ReelEditor.module.css';
+import React, { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
+import { ReelEditorProps } from "@/types";
+import { useReelEditorStore } from "@/lib/store/useReelEditorStore";
+import { ReelClipDataProcessor } from "@/lib/services/ReelClipDataProcessor";
+import { ElevenLabsService } from "@/lib/services/ElevenLabsService";
+import { VideoPlayer } from "./VideoPlayer";
+import { CaptionCanvas } from "./CaptionCanvas";
+import { Timeline } from "./Timeline";
+import { TranscriptionLoader } from "./TranscriptionLoader";
+import { TranscriptionEditor } from "./TranscriptionEditor";
+import { CaptionStyleEditor } from "./CaptionStyleEditor";
+import { CaptionOnboarding } from "./CaptionOnboarding";
+import { ExportButton } from "./ExportButton";
+import styles from "./ReelEditor.module.css";
 
 export function ReelEditor({
   clipData,
-  title,
-  theme = 'light',
-  aspectRatio = '9:16',
-  exportQuality = 'medium',
+  theme = "light",
+  aspectRatio = "9:16",
+  exportQuality = "medium",
   onClipLoaded,
   onExportSuccess,
   onExportError,
 }: ReelEditorProps) {
-  const t = useTranslations('editor');
-  const tCommon = useTranslations('common');
-  const { setCurrentClip, updateClipMetadata, currentClip, transcriptionState, setTranscriptionState, exportFormat, setExportFormat, isEditingTranscription } = useReelEditorStore();
-  const [processedClipData, setProcessedClipData] = useState<typeof clipData | null>(null);
+  const t = useTranslations("editor");
+  const {
+    setCurrentClip,
+    currentClip,
+    transcriptionState,
+    setTranscriptionState,
+    exportFormat,
+    setExportFormat,
+    selectedCaptionId,
+    setSelectedCaptionId,
+  } = useReelEditorStore();
+  const [processedClipData, setProcessedClipData] = useState<
+    typeof clipData | null
+  >(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
 
-  // Sync title prop to store so export/publish use latest title without re-initializing clip
+  // Show onboarding when editor loads (unless user chose "Don't show again")
   useEffect(() => {
-    if (title !== undefined) {
-      updateClipMetadata({ title });
+    if (!onboardingDismissed && !showOnboarding && currentClip) {
+      // Check if user chose "Don't show again" (stored in localStorage)
+      const dontShow =
+        typeof window !== "undefined" &&
+        localStorage.getItem("reelify_caption_onboarding_dont_show") === "true";
+
+      console.log("[Onboarding] Check:", {
+        dontShow,
+        currentClip: !!currentClip,
+        onboardingDismissed,
+        showOnboarding,
+      });
+
+      if (!dontShow) {
+        // Small delay to ensure editor is fully rendered
+        const timer = setTimeout(() => {
+          console.log("[Onboarding] Showing onboarding");
+          setShowOnboarding(true);
+        }, 1000);
+        return () => clearTimeout(timer);
+      }
     }
-  }, [title, updateClipMetadata]);
+  }, [currentClip, onboardingDismissed, showOnboarding]);
+
+  const handleOnboardingDismiss = () => {
+    setShowOnboarding(false);
+    setOnboardingDismissed(true);
+    // Note: The "Don't show again" preference is handled in CaptionOnboarding component
+  };
+
+  // Keyboard shortcut to reset and show onboarding (Ctrl+Shift+O or Cmd+Shift+O)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "O") {
+        e.preventDefault();
+        // Reset onboarding state
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("reelify_caption_onboarding_dont_show");
+          console.log("[Onboarding] Reset - cleared localStorage");
+        }
+        setOnboardingDismissed(false);
+        // Force show onboarding
+        setShowOnboarding(true);
+        console.log("[Onboarding] Forced to show");
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // Initialize clip data
   useEffect(() => {
@@ -42,12 +101,12 @@ export function ReelEditor({
     const processed = ReelClipDataProcessor.processClipData(clipData);
     if (processed.valid && processed.processedData) {
       setProcessedClipData(processed.processedData);
-      
+
       // Check if transcription is missing or empty
-      const needsTranscription = 
-        !processed.processedData.transcription || 
+      const needsTranscription =
+        !processed.processedData.transcription ||
         processed.processedData.transcription.segments.length === 0;
-      
+
       if (needsTranscription) {
         // Trigger auto-transcription
         handleTranscription(processed.processedData);
@@ -57,16 +116,16 @@ export function ReelEditor({
         onClipLoaded?.(processed.processedData.clipId);
       }
     } else {
-      onExportError?.(new Error(processed.error || 'Invalid clip data'));
+      onExportError?.(new Error(processed.error || "Invalid clip data"));
     }
   }, [clipData]);
 
   const handleTranscription = async (clip: typeof clipData) => {
-    setTranscriptionState({ status: 'loading' });
+    setTranscriptionState({ status: "loading" });
 
     try {
       const result = await ElevenLabsService.transcribeAudio(
-        clip.videoSourceUrl
+        clip.videoSourceUrl,
         // Language will be auto-detected
       );
 
@@ -80,13 +139,14 @@ export function ReelEditor({
 
       setProcessedClipData(updatedClip);
       setCurrentClip(updatedClip);
-      setTranscriptionState({ status: 'success' });
+      setTranscriptionState({ status: "success" });
       onClipLoaded?.(updatedClip.clipId);
     } catch (error) {
-      console.error('Transcription error:', error);
+      console.error("Transcription error:", error);
       setTranscriptionState({
-        status: 'error',
-        error: error instanceof Error ? error.message : 'Failed to transcribe video',
+        status: "error",
+        error:
+          error instanceof Error ? error.message : "Failed to transcribe video",
       });
     }
   };
@@ -101,18 +161,21 @@ export function ReelEditor({
     if (processedClipData) {
       // Continue without captions
       setCurrentClip(processedClipData);
-      setTranscriptionState({ status: 'success' });
+      setTranscriptionState({ status: "success" });
       onClipLoaded?.(processedClipData.clipId);
     }
   };
 
   // Show transcription loader if transcribing
-  if (transcriptionState.status === 'loading' || transcriptionState.status === 'error') {
+  if (
+    transcriptionState.status === "loading" ||
+    transcriptionState.status === "error"
+  ) {
     return (
       <>
         <div className={`${styles.container} ${styles[theme]}`}>
           <div className={styles.editor}>
-            <div className={styles.loadingMessage}>{t('preparingEditor')}</div>
+            <div className={styles.loadingMessage}>{t("preparingEditor")}</div>
           </div>
         </div>
         <TranscriptionLoader
@@ -127,63 +190,118 @@ export function ReelEditor({
   if (!currentClip) {
     return (
       <div className={styles.container}>
-        <div className={styles.loading}>{t('loadingEditor')}</div>
+        <div className={styles.loading}>{t("loadingEditor")}</div>
       </div>
     );
   }
 
+  // Handle clicks outside video area to deselect caption
+  const handleEditorClick = (e: React.MouseEvent) => {
+    // If clicking outside the video container and sidebar, deselect caption
+    const target = e.target as HTMLElement;
+    const videoContainer = target.closest(`.${styles.videoContainer}`);
+    const sidebar = target.closest(`.${styles.sidebar}`);
+
+    // Don't deselect if clicking inside video container or sidebar (where style editor is)
+    // Also don't deselect if clicking on moveable target or canvas (caption area)
+    const isMoveableTarget =
+      target.closest('[class*="moveableTarget"]') ||
+      target.closest('[class*="moveable"]');
+    const isCanvas = target.tagName === "CANVAS";
+
+    if (
+      !videoContainer &&
+      !sidebar &&
+      !isMoveableTarget &&
+      !isCanvas &&
+      selectedCaptionId
+    ) {
+      setSelectedCaptionId(null);
+    }
+  };
+
   return (
-    <div className={`${styles.container} ${styles[theme]}`}>
-      <div className={styles.editor}>
-        <div className={styles.videoSection}>
-          <div className={styles.videoContainer}>
-            <div 
-              className={styles.videoPlayerWrapper}
-              data-format={exportFormat}
-            >
-              <VideoPlayer videoUrl={currentClip.videoSourceUrl} format={exportFormat} />
-              <CaptionCanvas 
-                videoWidth={1080} 
-                videoHeight={1920}
-              />
-            </div>
-            <div className={styles.formatToggle}>
-              <button
-                className={styles.toggleSwitch}
-                onClick={() => !isEditingTranscription && setExportFormat(exportFormat === 'zoom' ? 'landscape' : 'zoom')}
-                role="switch"
-                aria-checked={exportFormat === 'landscape'}
-                aria-disabled={isEditingTranscription}
-                disabled={isEditingTranscription}
-                aria-label={`${t('format')}: ${exportFormat === 'zoom' ? t('zoom') : t('landscape')}`}
-                title={isEditingTranscription ? tCommon('disabledWhileEditingTranscription') : undefined}
+    <>
+      <CaptionOnboarding
+        isVisible={showOnboarding}
+        onDismiss={handleOnboardingDismiss}
+        selectedCaptionId={selectedCaptionId}
+      />
+      <div
+        className={`${styles.container} ${styles[theme]}`}
+        onClick={handleEditorClick}
+      >
+        <div className={styles.editor}>
+          <div className={styles.videoSection}>
+            <div className={styles.videoContainer}>
+              <div
+                className={styles.videoPlayerWrapper}
+                data-format={exportFormat}
+                data-onboarding="video-area"
               >
-                <span className={styles.toggleTrack}>
-                  <span className={styles.toggleTextZoom}>{t('zoom')}</span>
-                  <span className={styles.toggleTextLandscape}>{t('landscape')}</span>
-                  <span className={`${styles.toggleSlider} ${exportFormat === 'landscape' ? styles.toggleSliderActive : ''}`} />
-                </span>
-              </button>
+                <VideoPlayer
+                  videoUrl={currentClip.videoSourceUrl}
+                  format={exportFormat}
+                />
+                <CaptionCanvas videoWidth={1080} videoHeight={1920} />
+              </div>
+              <div
+                className={styles.formatToggle}
+                data-onboarding="format-toggle"
+              >
+                <button
+                  className={styles.toggleSwitch}
+                  onClick={() =>
+                    setExportFormat(
+                      exportFormat === "zoom" ? "landscape" : "zoom",
+                    )
+                  }
+                  role="switch"
+                  aria-checked={exportFormat === "landscape"}
+                  aria-label={`${t("format")}: ${exportFormat === "zoom" ? t("zoom") : t("landscape")}`}
+                >
+                  <span className={styles.toggleTrack}>
+                    <span className={styles.toggleTextZoom}>{t("zoom")}</span>
+                    <span className={styles.toggleTextLandscape}>
+                      {t("landscape")}
+                    </span>
+                    <span
+                      className={`${styles.toggleSlider} ${exportFormat === "landscape" ? styles.toggleSliderActive : ""}`}
+                    />
+                  </span>
+                </button>
+              </div>
+            </div>
+            <div data-onboarding="timeline">
+              <Timeline />
             </div>
           </div>
-          <Timeline />
-        </div>
-        
-        <div className={styles.sidebar}>
-          <div className={styles.sidebarHeader}>
-            <h2 className={styles.sidebarTitle}>{t('transcription')}</h2>
-            <ExportButton 
-              onExportSuccess={onExportSuccess}
-              onExportError={onExportError}
-              quality={exportQuality}
-            />
-          </div>
-          
-          <div className={styles.sidebarContent}>
-            <TranscriptionEditor />
+
+          <div className={styles.sidebar} data-onboarding="sidebar">
+            <div className={styles.sidebarHeader}>
+              <h2 className={styles.sidebarTitle}>{t("transcription")}</h2>
+              <div data-onboarding="export-button">
+                <ExportButton
+                  onExportSuccess={onExportSuccess}
+                  onExportError={onExportError}
+                  quality={exportQuality}
+                />
+              </div>
+            </div>
+
+            <div
+              className={styles.sidebarContent}
+              data-onboarding="transcription-editor"
+            >
+              {selectedCaptionId ? (
+                <CaptionStyleEditor />
+              ) : (
+                <TranscriptionEditor />
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

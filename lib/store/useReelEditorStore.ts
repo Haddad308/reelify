@@ -2,10 +2,25 @@ import { create } from "zustand";
 import {
   ReelClipInput,
   Caption,
+  CaptionStyle,
   TrimPoints,
   TranscriptionState,
 } from "@/types";
 import { filterVisibleCaptions } from "@/lib/utils/reelEditorUtils";
+
+// Default caption style
+const getDefaultCaptionStyle = (): CaptionStyle => ({
+  fontSize: 48,
+  fontFamily: "Arial",
+  color: "#FFFFFF",
+  backgroundColor: "rgba(0, 0, 0, 0.7)",
+  textAlign: "center",
+  padding: { top: 10, right: 20, bottom: 10, left: 20 },
+  maxWidth: 800,
+});
+
+// Default caption position
+const getDefaultCaptionPosition = () => ({ x: 540, y: 1500 });
 
 interface ReelEditorState {
   // Current clip data
@@ -18,6 +33,7 @@ interface ReelEditorState {
   // Captions
   captions: Caption[];
   selectedCaptionId: string | null;
+  lastEditedCaptionStyle: Caption["style"] | null; // Track last edited caption style for new captions
 
   // Playback state
   currentPlayheadTime: number;
@@ -32,7 +48,7 @@ interface ReelEditorState {
 
   // UI state
   showSafeAreas: boolean;
-  exportFormat: 'landscape' | 'zoom';
+  exportFormat: "landscape" | "zoom";
   isEditingTranscription: boolean;
 
   // Full-video transcription source (widest segment list) for extend trim and restore original
@@ -46,7 +62,10 @@ interface ReelEditorState {
 
   // Actions
   setCurrentClip: (clip: ReelClipInput) => void;
-  updateClipMetadata: (metadata: { title?: string; description?: string }) => void;
+  updateClipMetadata: (metadata: {
+    title?: string;
+    description?: string;
+  }) => void;
   setSourceVideoDuration: (duration: number) => void;
   setTrimPoints: (trimPoints: TrimPoints) => void;
   updateTrimStart: (startTime: number) => void;
@@ -65,10 +84,15 @@ interface ReelEditorState {
   setExportProgress: (progress: number) => void;
   setTranscriptionState: (state: TranscriptionState) => void;
   setShowSafeAreas: (show: boolean) => void;
-  setExportFormat: (format: 'landscape' | 'zoom') => void;
+  setExportFormat: (format: "landscape" | "zoom") => void;
   setIsEditingTranscription: (editing: boolean) => void;
   setFullTranscriptionSegments: (
-    segments: Array<{ text: string; start: number; end: number; language?: "ar" | "en" }>,
+    segments: Array<{
+      text: string;
+      start: number;
+      end: number;
+      language?: "ar" | "en";
+    }>,
   ) => void;
   setHasUserEditedTranscription: (value: boolean) => void;
   restoreOriginalTranscriptionForCurrentTrim: () => void;
@@ -81,6 +105,7 @@ const initialState = {
   trimPoints: { startTime: 0, endTime: 0 },
   captions: [],
   selectedCaptionId: null,
+  lastEditedCaptionStyle: null,
   currentPlayheadTime: 0,
   isPlaying: false,
   isExporting: false,
@@ -152,19 +177,36 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
         overlappingSegments: overlappingSegments.length,
       });
 
+      // Use last edited style if available, otherwise use default
+      const { lastEditedCaptionStyle } = get();
+      const defaultStyle = getDefaultCaptionStyle();
+      const captionStyle = lastEditedCaptionStyle || defaultStyle;
+      const captionPosition = getDefaultCaptionPosition();
+
       const captions: Caption[] = overlappingSegments.map((segment, index) => ({
         id: `caption-${index}`,
         text: segment.text,
         startTime: segment.start,
         endTime: segment.end,
-        position: { x: 540, y: 1500 }, // Default position (center-bottom for 9:16)
+        position: { ...captionPosition }, // Deep copy position
         style: {
+          ...captionStyle,
+          padding: captionStyle.padding
+            ? { ...captionStyle.padding }
+            : { top: 10, right: 20, bottom: 10, left: 20 },
+          // Deep copy nested objects
+          animation: captionStyle.animation
+            ? { ...captionStyle.animation }
+            : undefined,
+          shadow: captionStyle.shadow ? { ...captionStyle.shadow } : undefined,
+          keywordHighlights: captionStyle.keywordHighlights
+            ? [...captionStyle.keywordHighlights]
+            : undefined,
           fontSize: 48,
           fontFamily: "Arial",
           color: "#FFFFFF",
           backgroundColor: "rgba(0, 0, 0, 0.7)",
           textAlign: "center",
-          padding: { top: 10, right: 20, bottom: 10, left: 20 },
         },
         isVisible: true,
         language: segment.language,
@@ -329,7 +371,9 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
         : -Infinity;
     if (
       allSegments.length > 0 &&
-      (allMin < fullMin || allMax > fullMax || fullTranscriptionSegments.length === 0)
+      (allMin < fullMin ||
+        allMax > fullMax ||
+        fullTranscriptionSegments.length === 0)
     ) {
       set({ fullTranscriptionSegments: [...allSegments] });
     }
@@ -365,8 +409,23 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
           text: segment.text,
           startTime: segment.start,
           endTime: segment.end,
-          position: existingPosition,
-          style: existingStyle,
+          position: { ...existingPosition }, // Deep copy position
+          style: {
+            ...existingStyle,
+            padding: existingStyle.padding
+              ? { ...existingStyle.padding }
+              : undefined,
+            // Deep copy nested objects
+            animation: existingStyle.animation
+              ? { ...existingStyle.animation }
+              : undefined,
+            shadow: existingStyle.shadow
+              ? { ...existingStyle.shadow }
+              : undefined,
+            keywordHighlights: existingStyle.keywordHighlights
+              ? [...existingStyle.keywordHighlights]
+              : undefined,
+          },
           isVisible: true,
           language: segment.language || "ar",
         }));
@@ -376,7 +435,8 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
       const kept = captions
         .filter(
           (c) =>
-            c.startTime < trimPoints.endTime && c.endTime > trimPoints.startTime,
+            c.startTime < trimPoints.endTime &&
+            c.endTime > trimPoints.startTime,
         )
         .map((c) => ({ ...c, isVisible: true }))
         .sort((a, b) => a.startTime - b.startTime);
@@ -460,7 +520,10 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
         id: `caption-${trimStart.toFixed(1)}-${i}`,
       }));
       set({
-        trimPoints: { startTime: trimPoints.startTime, endTime: trimPoints.endTime },
+        trimPoints: {
+          startTime: trimPoints.startTime,
+          endTime: trimPoints.endTime,
+        },
         captions: withIds,
       });
       return;
@@ -468,8 +531,7 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
 
     if (sourceSegments.length > 0) {
       const overlappingSegments = sourceSegments.filter(
-        (s) =>
-          s.start < trimPoints.endTime && s.end > trimPoints.startTime,
+        (s) => s.start < trimPoints.endTime && s.end > trimPoints.startTime,
       );
       const newCaptions: Caption[] = overlappingSegments.map(
         (segment, index) => ({
@@ -491,7 +553,18 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
         captions: newCaptions,
       });
     } else {
+      // No transcription available - just filter existing captions
+      console.warn(
+        "[Store] No segments available, filtering existing captions only",
+      );
       const filteredCaptions = filterVisibleCaptions(captions, trimPoints);
+      console.log("[Store] Filtered captions:", {
+        originalCount: captions.length,
+        filteredCount: filteredCaptions.length,
+        visibleCount: filteredCaptions.filter((c) => c.isVisible).length,
+      });
+
+      // Update store with new trim points and filtered captions
       set({
         trimPoints: { ...trimPoints },
         captions: [...filteredCaptions],
@@ -536,17 +609,67 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
   },
 
   updateCaptionPosition: (id, position) => {
-    get().updateCaption(id, { position });
+    const { captions } = get();
+    // Apply the same position to ALL captions to ensure consistency
+    const updatedCaptions = captions.map((caption) => ({
+      ...caption,
+      position: { ...position }, // Apply same position to all captions
+    }));
+    set({ captions: updatedCaptions });
   },
 
   updateCaptionStyle: (id, style) => {
-    const { captions } = get();
+    const { captions, selectedCaptionId } = get();
+
+    // Update the specific caption
     const updatedCaptions = captions.map((caption) =>
       caption.id === id
         ? { ...caption, style: { ...caption.style, ...style } }
         : caption,
     );
-    set({ captions: updatedCaptions });
+    // Track the last edited caption style for new captions
+    const editedCaption = updatedCaptions.find((c) => c.id === id);
+    if (editedCaption) {
+      const newStyle = editedCaption.style;
+      // Apply the same style to ALL other captions to ensure consistency
+      // IMPORTANT: Preserve each caption's position - only update style properties
+      const allUpdatedCaptions = updatedCaptions.map((caption) => {
+        if (caption.id === id) {
+          return caption; // Already updated
+        }
+        // Apply the same style to all other captions, but preserve their individual positions
+        return {
+          ...caption,
+          position: { ...caption.position }, // Preserve individual position
+          style: {
+            ...newStyle,
+            // Deep copy nested objects
+            padding: newStyle.padding ? { ...newStyle.padding } : undefined,
+            animation: newStyle.animation
+              ? { ...newStyle.animation }
+              : undefined,
+            shadow: newStyle.shadow ? { ...newStyle.shadow } : undefined,
+            keywordHighlights: newStyle.keywordHighlights
+              ? [...newStyle.keywordHighlights]
+              : undefined,
+            // Ensure maxWidth and customHeight are applied consistently
+            maxWidth: newStyle.maxWidth,
+            customHeight: newStyle.customHeight,
+          },
+        };
+      });
+
+      // CRITICAL: Preserve selectedCaptionId - don't clear it when updating styles
+      // The selected caption should still exist since we're just updating styles, not removing captions
+      set({
+        captions: allUpdatedCaptions,
+        lastEditedCaptionStyle: newStyle,
+        // Explicitly preserve selectedCaptionId - don't change it
+        selectedCaptionId: selectedCaptionId,
+      });
+    } else {
+      set({ captions: updatedCaptions });
+    }
   },
 
   setSelectedCaptionId: (id) => {
@@ -594,16 +717,12 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
   },
 
   restoreOriginalTranscriptionForCurrentTrim: () => {
-    const {
-      trimPoints,
-      fullTranscriptionSegments,
-      currentClip,
-      captions,
-    } = get();
+    const { trimPoints, fullTranscriptionSegments, currentClip, captions } =
+      get();
     const sourceSegments =
       fullTranscriptionSegments.length > 0
         ? fullTranscriptionSegments
-        : currentClip?.transcription?.segments?.map((seg) => ({
+        : (currentClip?.transcription?.segments?.map((seg) => ({
             text: String(seg.text || "").trim(),
             start: Number(seg.start) || 0,
             end: Number(seg.end) || 0,
@@ -612,7 +731,7 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
               ((/[\u0600-\u06FF]/.test(String(seg.text)) ? "ar" : "en") as
                 | "ar"
                 | "en"),
-          })) ?? [];
+          })) ?? []);
     if (sourceSegments.length === 0) return;
     const existingStyle =
       captions.length > 0
@@ -628,8 +747,7 @@ export const useReelEditorStore = create<ReelEditorState>((set, get) => ({
     const existingPosition =
       captions.length > 0 ? captions[0].position : { x: 540, y: 1500 };
     const overlapping = sourceSegments.filter(
-      (s) =>
-        s.start < trimPoints.endTime && s.end > trimPoints.startTime,
+      (s) => s.start < trimPoints.endTime && s.end > trimPoints.startTime,
     );
     const newCaptions: Caption[] = overlapping.map((segment, index) => ({
       id: `caption-restore-${index}`,

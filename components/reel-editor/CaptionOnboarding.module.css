@@ -1,0 +1,376 @@
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 9999;
+  animation: fadeIn 0.3s ease-in;
+}
+
+.overlaySection {
+  position: fixed;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 9999;
+  animation: fadeIn 0.3s ease-in;
+}
+
+.highlight {
+  position: fixed;
+  border: 2px solid rgba(255, 107, 122, 0.6);
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 4px rgba(255, 107, 122, 0.1),
+    0 0 15px rgba(255, 107, 122, 0.2);
+  background: transparent;
+  pointer-events: none;
+  animation: pulse 2s ease-in-out infinite;
+  z-index: 10001;
+  /* Ensure highlight is above overlay sections but below popover */
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 4px rgba(255, 107, 122, 0.1),
+      0 0 15px rgba(255, 107, 122, 0.2);
+  }
+  50% {
+    box-shadow:
+      0 0 0 5px rgba(255, 107, 122, 0.15),
+      0 0 20px rgba(255, 107, 122, 0.3);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.popover {
+  position: fixed;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  z-index: 10000;
+  min-width: 320px;
+  max-width: 400px;
+  width: 350px;
+  animation: slideUp 0.3s ease-out;
+  border: 2px solid rgba(255, 107, 122, 0.2);
+  transform: translateZ(0); /* Force hardware acceleration */
+  will-change: transform, top, left; /* Optimize for position changes */
+}
+
+/* Pointer pointing down (popover above element) */
+.popover.pointerBottom::before {
+  content: "";
+  position: absolute;
+  width: 0;
+  height: 0;
+  border: 10px solid transparent;
+  border-top-color: white;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10001;
+}
+
+.popover.pointerBottom::after {
+  content: "";
+  position: absolute;
+  width: 0;
+  height: 0;
+  border: 12px solid transparent;
+  border-top-color: rgba(255, 107, 122, 0.2);
+  bottom: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+}
+
+/* Pointer pointing up (popover below element) */
+.popover.pointerTop::before {
+  content: "";
+  position: absolute;
+  width: 0;
+  height: 0;
+  border: 10px solid transparent;
+  border-bottom-color: white;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10001;
+}
+
+.popover.pointerTop::after {
+  content: "";
+  position: absolute;
+  width: 0;
+  height: 0;
+  border: 12px solid transparent;
+  border-bottom-color: rgba(255, 107, 122, 0.2);
+  top: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+}
+
+/* Pointer pointing left (popover on right side of element) */
+.popover.pointerLeft::before {
+  content: "";
+  position: absolute;
+  width: 0;
+  height: 0;
+  border: 10px solid transparent;
+  border-right-color: white;
+  left: -20px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10001;
+}
+
+.popover.pointerLeft::after {
+  content: "";
+  position: absolute;
+  width: 0;
+  height: 0;
+  border: 12px solid transparent;
+  border-right-color: rgba(255, 107, 122, 0.2);
+  left: -24px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10000;
+}
+
+/* Pointer pointing right (popover on left side of element) */
+.popover.pointerRight::before {
+  content: "";
+  position: absolute;
+  width: 0;
+  height: 0;
+  border: 10px solid transparent;
+  border-left-color: white;
+  right: -20px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10001;
+}
+
+.popover.pointerRight::after {
+  content: "";
+  position: absolute;
+  width: 0;
+  height: 0;
+  border: 12px solid transparent;
+  border-left-color: rgba(255, 107, 122, 0.2);
+  right: -24px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10000;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.popoverHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e5e5;
+  position: relative;
+}
+
+.icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.title {
+  flex: 1;
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  color: #1a1a1a;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #666;
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+  padding: 0;
+  line-height: 1;
+}
+
+.closeButton:hover {
+  background-color: #f0f0f0;
+}
+
+.popoverContent {
+  padding: 20px;
+}
+
+.popoverContent p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #333;
+}
+
+.popoverFooter {
+  padding: 16px 20px;
+  border-top: 1px solid #e5e5e5;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stepIndicator {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  align-items: center;
+}
+
+.stepDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ddd;
+  transition: all 0.3s;
+}
+
+.stepDot.active {
+  width: 24px;
+  border-radius: 4px;
+  background: rgba(255, 107, 122, 0.8);
+}
+
+.stepDot.completed {
+  background: #FF8A95;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.prevButton,
+.nextButton {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.prevButton {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.prevButton:hover {
+  background: #e0e0e0;
+}
+
+.nextButton {
+  background: rgba(255, 107, 122, 0.9);
+  color: white;
+}
+
+.nextButton:hover {
+  background: rgba(229, 82, 95, 0.9);
+}
+
+.dontShowAgain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #666;
+  cursor: pointer;
+  user-select: none;
+}
+
+.dontShowAgain input[type="checkbox"] {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  accent-color: #FF6B7A;
+}
+
+.dontShowAgain span {
+  line-height: 1.4;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .popover {
+    background: #1a1a1a;
+    border-color: rgba(255, 107, 122, 0.3);
+  }
+
+  .popoverHeader {
+    border-bottom-color: #333;
+  }
+
+  .title {
+    color: #e0e0e0;
+  }
+
+  .popoverContent p {
+    color: #d0d0d0;
+  }
+
+  .popoverFooter {
+    border-top-color: #333;
+  }
+
+  .closeButton {
+    color: #999;
+  }
+
+  .closeButton:hover {
+    background-color: #2a2a2a;
+  }
+
+  .prevButton {
+    background: #2a2a2a;
+    color: #e0e0e0;
+  }
+
+  .prevButton:hover {
+    background: #3a3a3a;
+  }
+
+  .dontShowAgain {
+    color: #999;
+  }
+}

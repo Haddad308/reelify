@@ -231,6 +231,7 @@ export function TranscriptionEditor() {
       captions.length > 0 ? captions[0].position : { x: 540, y: 1500 };
 
     // Create new captions from edited text within trim range
+    // IMPORTANT: Create deep copies of style and position to avoid reference sharing
     const newCaptions = sentences.map((text, index) => {
       const startTime = trimStart + index * segmentDuration;
       const endTime = startTime + segmentDuration;
@@ -240,8 +241,23 @@ export function TranscriptionEditor() {
         text: text.trim(),
         startTime,
         endTime,
-        position: existingPosition, // Preserve position
-        style: existingStyle, // Preserve style
+        position: { ...existingPosition }, // Deep copy position
+        style: {
+          ...existingStyle,
+          // Deep copy nested objects
+          padding: existingStyle.padding
+            ? { ...existingStyle.padding }
+            : undefined,
+          animation: existingStyle.animation
+            ? { ...existingStyle.animation }
+            : undefined,
+          shadow: existingStyle.shadow
+            ? { ...existingStyle.shadow }
+            : undefined,
+          keywordHighlights: existingStyle.keywordHighlights
+            ? [...existingStyle.keywordHighlights]
+            : undefined,
+        },
         isVisible: true,
         language: detectedLanguage, // Use detected language
       };
