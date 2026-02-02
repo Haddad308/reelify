@@ -42,8 +42,12 @@ const FONT_WEIGHTS = [
 
 export function CaptionStyleEditor() {
   const t = useTranslations("captionStyleEditor");
-  const { captions, selectedCaptionId, updateCaptionStyle, setSelectedCaptionId } =
-    useReelEditorStore();
+  const {
+    captions,
+    selectedCaptionId,
+    updateCaptionStyle,
+    setSelectedCaptionId,
+  } = useReelEditorStore();
 
   const selectedCaption = captions.find((c) => c.id === selectedCaptionId);
   const style = selectedCaption?.style;
@@ -119,7 +123,9 @@ export function CaptionStyleEditor() {
         <h3 className={styles.title}>{t("captionStyle")}</h3>
         {selectedCaption && (
           <div className={styles.exitHint} role="status" aria-live="polite">
-            <span className={styles.exitHintIcon} aria-hidden>⌨️</span>
+            <span className={styles.exitHintIcon} aria-hidden>
+              ⌨️
+            </span>
             <span>{t("pressEscToExit")}</span>
           </div>
         )}
