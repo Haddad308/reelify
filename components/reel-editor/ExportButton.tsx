@@ -176,7 +176,9 @@ export function ExportButton({
       console.log("[ExportButton] Caption state before export:", {
         totalCaptions: captions.length,
         visibleCaptions: captions.filter((c) => c.isVisible).length,
-        trimRange: `${trimPoints.startTime.toFixed(2)} - ${trimPoints.endTime.toFixed(2)}`,
+        trimRange: `${trimPoints.startTime.toFixed(
+          2,
+        )} - ${trimPoints.endTime.toFixed(2)}`,
         captionDetails: captions.map((c) => ({
           id: c.id,
           text: c.text.substring(0, 30),
@@ -322,8 +324,8 @@ export function ExportButton({
   const statusText = isExporting
     ? t("exporting", { progress: exportProgress })
     : isPublishing
-      ? t("publishing", { progress: publishProgress })
-      : null;
+    ? t("publishing", { progress: publishProgress })
+    : null;
 
   // Always show dropdown: Download + Publish to any supported platform (independent of CTA selection)
   return (
@@ -363,6 +365,8 @@ export function ExportButton({
           !isEditingTranscription &&
           dropdownPosition &&
           mounted &&
+          typeof document !== "undefined" &&
+          document.body &&
           createPortal(
             <div
               ref={dropdownRef}
@@ -408,7 +412,7 @@ export function ExportButton({
                 );
               })}
             </div>,
-            typeof document !== "undefined" ? document.body : null,
+            document.body,
           )}
       </div>
 
