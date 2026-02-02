@@ -260,6 +260,7 @@
   "captionStyleEditor": {
     "noCaptionSelected": "Click on a caption in the video to edit its style",
     "captionStyle": "Caption Style",
+    "pressEscToExit": "Press ESC to exit edit mode",
     "textStyle": "Text Style",
     "boxStyle": "Box Style",
     "fontFamily": "Font Family",
@@ -274,7 +275,7 @@
   },
   "captionOnboarding": {
     "step1Title": "Video with Transcription",
-    "step1Content": "Here you can see your video with transcription. Click on any caption to start editing. You can drag the caption to change its position and resize it using the blue border handles.",
+    "step1Content": "Here you can see your video with transcription. Click on any caption to start editing. You can drag the caption to change its position and resize it using the red border handles.",
     "step2Title": "Subtitle Styling Editor",
     "step2Content": "When you click on a caption, the styling editor appears here. You can customize the font color, font family, font weight, and background color of your subtitles.",
     "step3Title": "Landscape & Zoom Formats",

@@ -1,8 +1,8 @@
 .container {
   padding: 16px;
-  background: #fff;
+  background: hsl(var(--card));
   border-radius: 8px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid hsl(var(--border));
 }
 
 .placeholder {
@@ -12,11 +12,39 @@
   font-size: 14px;
 }
 
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+
 .title {
   font-size: 18px;
   font-weight: 600;
-  margin: 0 0 16px 0;
-  color: #333;
+  margin: 0;
+  color: hsl(var(--foreground));
+  flex: 1;
+}
+
+.exitHint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: hsl(var(--muted) / 0.6);
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.exitHintIcon {
+  font-size: 14px;
+  opacity: 0.8;
 }
 
 .section {
