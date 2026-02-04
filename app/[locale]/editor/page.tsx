@@ -158,31 +158,6 @@ function EditorContent() {
     void validateAndLoadVideo();
   }, [videoUrlParam, endTimeParam]);
 
-  useEffect(() => {
-    if (!videoUrl) return;
-
-    const video = document.createElement("video");
-    video.preload = "metadata";
-    video.src = videoUrl;
-
-    video.onloadedmetadata = () => {
-      setVideoDuration(video.duration);
-      setIsLoadingDuration(false);
-    };
-
-    video.onerror = () => {
-      setIsLoadingDuration(false);
-      if (endTimeParam) {
-        const endTime = Number.parseFloat(endTimeParam);
-        setVideoDuration(Math.max(endTime + 10, 60));
-      }
-    };
-
-    return () => {
-      video.src = "";
-    };
-  }, [videoUrl, endTimeParam]);
-
   const clipData: ReelClipInput | null = useMemo(() => {
     if (!videoUrl) return null;
 
@@ -360,12 +335,7 @@ function EditorContent() {
   }
 
   const handleExportSuccess = (result: ReelExportResult) => {
-    const a = document.createElement("a");
-    a.href = result.videoUrl;
-    a.download = `${editedTitle || "reel"}-edited.mp4`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    // Download is already handled by ExportPanel, just cleanup
     URL.revokeObjectURL(result.videoUrl);
   };
 
