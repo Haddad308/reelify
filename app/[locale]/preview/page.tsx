@@ -208,7 +208,7 @@ function PreviewContent() {
           text: seg.text,
           startTime: Math.max(seg.start, reelStart),
           endTime: Math.min(seg.end, reelEnd),
-          position: { x: 50, y: 85 }, // Center bottom
+          position: { x: 540, y: 1632 }, // Center bottom (pixel coordinates for 1080x1920)
           style: DEFAULT_CAPTION_STYLE,
           isVisible: true,
           language: /[\u0600-\u06FF]/.test(seg.text)
@@ -239,7 +239,7 @@ function PreviewContent() {
           text: text.trim(),
           startTime: startTime + index * segmentDuration,
           endTime: startTime + (index + 1) * segmentDuration,
-          position: { x: 50, y: 85 }, // Center bottom
+          position: { x: 540, y: 1632 }, // Center bottom (pixel coordinates for 1080x1920)
           style: DEFAULT_CAPTION_STYLE,
           isVisible: true,
           language: /[\u0600-\u06FF]/.test(text)
