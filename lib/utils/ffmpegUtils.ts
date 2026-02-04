@@ -1968,39 +1968,19 @@ function buildReframingFilters(
  * Quality impact is minimal - mainly affects file size, not visual quality.
  */
 export function getExportSettings(
-  quality: "low" | "medium" | "high" = "medium",
+  quality: "high",
   formatOptions?: ExportFormatOptions,
 ): ExportSettings {
   const presets = {
-    low: {
-      videoCodec: "libx264",
-      audioCodec: "aac",
-      videoBitrate: "1M",
-      audioBitrate: "96k",
-      resolution: "720x1280",
-      fps: 24,
-      preset: "ultrafast",
-      crf: 28,
-    },
-    medium: {
-      videoCodec: "libx264",
-      audioCodec: "aac",
-      videoBitrate: "2M",
-      audioBitrate: "128k",
-      resolution: "1080x1920",
-      fps: 30,
-      preset: "ultrafast", // Changed from 'medium' for 5-10x faster encoding
-      crf: 23,
-    },
     high: {
       videoCodec: "libx264",
       audioCodec: "aac",
-      videoBitrate: "4M",
+      videoBitrate: "12M", // Max bitrate cap for rate control
       audioBitrate: "192k",
       resolution: "1080x1920",
       fps: 30,
-      preset: "veryfast", // Changed from 'slow' for faster encoding
-      crf: 20, // Slightly adjusted for balance between quality and speed
+      preset: "ultrafast", // Critical for FFmpeg WASM performance (~10x faster)
+      crf: 16, // High quality (lower = better, 16 is excellent)
     },
   };
 
@@ -2012,10 +1992,10 @@ export function getExportSettings(
     const { format } = formatOptions;
     if (format === "zoom") {
       // Zoom: 9:16 aspect ratio (portrait with smart cropping/zooming)
-      resolution = quality === "low" ? "720x1280" : "1080x1920";
+      resolution = "1080x1920";
     } else if (format === "landscape") {
       // Landscape: 9:16 aspect ratio (show full video with black bars)
-      resolution = quality === "low" ? "720x1280" : "1080x1920";
+      resolution = "1080x1920";
     }
   }
 

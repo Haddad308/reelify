@@ -1,9 +1,9 @@
 {
   "keyTopics": "القيادة والعمل الجماعي",
   "callToAction": "تابعنا للمزيد",
-  "hookStyle": "قصة قصيرة",
-  "platform": "instagram",
-  "preferredDuration": 45,
+  "hookStyle": "Alert or warning",
+  "platform": "youtube",
+  "preferredDuration": 60,
   "audience": "رواد أعمال",
   "tone": "تعليمي"
 }

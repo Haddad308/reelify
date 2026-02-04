@@ -13,7 +13,6 @@ import styles from "./ExportButton.module.css";
 interface ExportButtonProps {
   onExportSuccess?: (result: ReelExportResult) => void;
   onExportError?: (error: Error) => void;
-  quality?: "low" | "medium" | "high";
 }
 
 type SelectedPlatform =
@@ -78,7 +77,6 @@ const PLATFORM_CONFIG: Record<
 export function ExportButton({
   onExportSuccess,
   onExportError,
-  quality = "medium",
 }: ExportButtonProps) {
   const t = useTranslations("exportButton");
   const tCommon = useTranslations("common");
@@ -232,7 +230,6 @@ export function ExportButton({
         trimPoints.endTime,
         captionsToExport,
         currentClip.clipId,
-        quality,
         (progress) => setExportProgress(progress),
         formatOptions,
       );

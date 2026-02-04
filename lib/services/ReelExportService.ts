@@ -77,7 +77,6 @@ export class ReelExportService {
     endTime: number,
     captions: Caption[],
     clipId: string,
-    quality: "low" | "medium" | "high" = "medium",
     onProgress?: (progress: number) => void,
     formatOptions?: ExportFormatOptions,
   ): Promise<ReelExportResult> {
@@ -107,7 +106,6 @@ export class ReelExportService {
         endTime,
         visibleCaptions,
         clipId,
-        quality,
         onProgress,
         formatOptions,
       );
@@ -118,7 +116,7 @@ export class ReelExportService {
 
     const ffmpeg = await this.initialize();
     const duration = endTime - startTime;
-    const settings = getExportSettings(quality, formatOptions);
+    const settings = getExportSettings("high", formatOptions);
 
     console.log("Export parameters:", {
       videoUrl,
@@ -126,7 +124,6 @@ export class ReelExportService {
       endTime,
       duration,
       captionsCount: captions.length,
-      quality,
       formatOptions,
       settings,
     });
