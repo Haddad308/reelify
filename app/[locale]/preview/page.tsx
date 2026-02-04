@@ -5,8 +5,21 @@ import { Suspense, useState, useMemo, useEffect, useRef } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ReelClipInput } from "@/types";
+import { ReelClipInput, Caption, CaptionStyle } from "@/types";
 import { getVideoBlobUrl } from "@/lib/videoStorage";
+import { ExportPanel } from "@/components/reel-editor/ExportPanel";
+import { Download } from "lucide-react";
+
+const DEFAULT_CAPTION_STYLE: CaptionStyle = {
+  fontSize: 24,
+  fontFamily: "Inter, sans-serif",
+  fontWeight: "600",
+  color: "#ffffff",
+  backgroundColor: "rgba(0, 0, 0, 0.7)",
+  textAlign: "center",
+  padding: { top: 8, right: 12, bottom: 8, left: 12 },
+  opacity: 1,
+};
 
 function PreviewContent() {
   const searchParams = useSearchParams();
@@ -65,6 +78,11 @@ function PreviewContent() {
   const firstReelSegmentRef = useRef<HTMLSpanElement | null>(null);
   const transcriptScrollContainerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Export panel state
+  const [showExportPanel, setShowExportPanel] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
 
   useEffect(() => {
     if (urlParam) {
@@ -177,6 +195,28 @@ function PreviewContent() {
       .join(" ");
   }, [fullTranscriptSegments]);
 
+  // Build captions from transcription segments for export
+  const captionsForExport: Caption[] = useMemo(() => {
+    if (!fullTranscriptSegments) return [];
+
+    const { segments, reelStart, reelEnd } = fullTranscriptSegments;
+
+    return segments
+      .filter((seg) => seg.start < reelEnd && seg.end > reelStart)
+      .map((seg, index) => ({
+        id: `caption-${index}`,
+        text: seg.text,
+        startTime: Math.max(seg.start, reelStart),
+        endTime: Math.min(seg.end, reelEnd),
+        position: { x: 50, y: 85 }, // Center bottom
+        style: DEFAULT_CAPTION_STYLE,
+        isVisible: true,
+        language: /[\u0600-\u06FF]/.test(seg.text)
+          ? ("ar" as const)
+          : ("en" as const),
+      }));
+  }, [fullTranscriptSegments]);
+
   const firstReelSegmentIndex = useMemo(() => {
     if (!fullTranscriptSegments) return -1;
     return fullTranscriptSegments.segments.findIndex(
@@ -265,22 +305,15 @@ function PreviewContent() {
     );
   }
 
-  const handleDownloadVideo = async () => {
-    try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const downloadUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = downloadUrl;
-      a.download = `${title}.mp4`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(downloadUrl);
-    } catch {
-      window.open(url, "_blank");
-    }
-  };
+  // Get trim points for export
+  const exportStartTime =
+    startTimeParam != null && Number.isFinite(parseFloat(startTimeParam))
+      ? parseFloat(startTimeParam)
+      : 0;
+  const exportEndTime =
+    endTimeParam != null && Number.isFinite(parseFloat(endTimeParam))
+      ? parseFloat(endTimeParam)
+      : videoDuration || parseFloat(duration || "60");
 
   const handleDownloadThumbnail = async () => {
     if (!thumbnail) return;
@@ -606,24 +639,53 @@ function PreviewContent() {
                 </h3>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <Button
-                    onClick={handleDownloadVideo}
+                    onClick={() => setShowExportPanel(true)}
+                    disabled={isExporting}
                     className="w-full text-white h-12 bg-gradient-teal hover:shadow-teal hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
                   >
-                    <svg
-                      className="w-5 h-5 me-2"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                      />
-                    </svg>
-                    {t("downloadVideo")}
+                    {isExporting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin me-2" />
+                        {exportProgress}%
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-5 h-5 me-2" />
+                        {t("downloadVideo")}
+                      </>
+                    )}
                   </Button>
+
+                  {/* Export Panel - Shared Component */}
+                  <ExportPanel
+                    isOpen={showExportPanel && !isExporting}
+                    onClose={() => setShowExportPanel(false)}
+                    videoUrl={url}
+                    startTime={exportStartTime}
+                    endTime={exportEndTime}
+                    captions={captionsForExport}
+                    title={title}
+                    description={transcript}
+                    clipId={`preview-${Date.now()}`}
+                    exportFormat="zoom"
+                    onExportStart={() => {
+                      setIsExporting(true);
+                      setExportProgress(0);
+                    }}
+                    onExportProgress={(progress) => setExportProgress(progress)}
+                    onExportSuccess={() => setIsExporting(false)}
+                    onExportError={() => setIsExporting(false)}
+                  />
+
+                  {/* Progress Bar */}
+                  {isExporting && (
+                    <div className="col-span-full h-1 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-primary to-primary/80 transition-all duration-300"
+                        style={{ width: `${exportProgress}%` }}
+                      />
+                    </div>
+                  )}
                   {thumbnail && (
                     <Button
                       onClick={handleDownloadThumbnail}
