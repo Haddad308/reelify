@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { TranscriptSegment } from "./elevenlabs";
 import type { QAPreferences } from "./qaStore";
+import { metrics } from "./services/MetricsService";
 
 export type ClipCandidate = {
   title: string;
@@ -72,7 +73,7 @@ const parseGeminiJson = (raw: string): ClipCandidate[] => {
 export async function generateClipCandidates(
   segments: TranscriptSegment[],
   preferences?: QAPreferences,
-  outputLanguage: OutputLanguage = "ar",
+  outputLanguage: OutputLanguage = "ar"
 ): Promise<ClipCandidate[]> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -94,7 +95,7 @@ export async function generateClipCandidates(
     // Default to gemini-3-flash-preview (fastest and working)
     modelName = "gemini-3-flash-preview";
     console.log(
-      `[Gemini] Using default model: ${modelName} (fastest available)`,
+      `[Gemini] Using default model: ${modelName} (fastest available)`
     );
   }
 
@@ -106,7 +107,9 @@ export async function generateClipCandidates(
   const transcript = segments
     .map(
       (segment) =>
-        `[${segment.start.toFixed(2)} - ${segment.end.toFixed(2)}] ${segment.text}`,
+        `[${segment.start.toFixed(2)} - ${segment.end.toFixed(2)}] ${
+          segment.text
+        }`
     )
     .join("\n");
 
@@ -238,7 +241,7 @@ ${transcript}
 
   const geminiStart = Date.now();
   console.log(
-    `[Gemini] Starting clip generation (${segments.length} segments, ${transcript.length} chars)`,
+    `[Gemini] Starting clip generation (${segments.length} segments, ${transcript.length} chars)`
   );
 
   let result;
@@ -265,13 +268,19 @@ ${transcript}
     });
     text = result.response.text();
   } catch (error: unknown) {
+    const geminiErrorTime = Date.now() - geminiStart;
+
+    // Track API error
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await metrics.trackApiError("gemini", errorMessage, geminiErrorTime);
+
     // If model fails with 404, try fallback models in order
     if (
       error instanceof Error &&
       (error.message.includes("404") || error.message.includes("not found"))
     ) {
       console.warn(
-        `[Gemini] Model ${currentModelName} not available, trying fallback models...`,
+        `[Gemini] Model ${currentModelName} not available, trying fallback models...`
       );
 
       for (const fallbackModelName of fallbackModels) {
@@ -287,13 +296,14 @@ ${transcript}
             generationConfig,
           });
           text = result.response.text();
+          currentModelName = fallbackModelName;
           console.log(
-            `[Gemini] Successfully used fallback model: ${fallbackModelName}`,
+            `[Gemini] Successfully used fallback model: ${fallbackModelName}`
           );
           break;
         } catch (fallbackError) {
           console.warn(
-            `[Gemini] Fallback model ${fallbackModelName} also failed, trying next...`,
+            `[Gemini] Fallback model ${fallbackModelName} also failed, trying next...`
           );
           continue;
         }
@@ -301,17 +311,78 @@ ${transcript}
 
       // If all fallbacks failed, throw original error
       if (!text) {
-        throw new Error(
-          `All Gemini models failed. Tried: ${currentModelName}, ${fallbackModels.join(", ")}. Error: ${error.message}`,
-        );
+        const finalError = `All Gemini models failed. Tried: ${currentModelName}, ${fallbackModels.join(
+          ", "
+        )}. Error: ${error.message}`;
+
+        // Track final failure
+        await metrics.trackGemini({
+          model: currentModelName,
+          tokens_input: 0,
+          tokens_output: 0,
+          tokens_total: 0,
+          cost_usd: 0,
+          response_time_minutes: geminiErrorTime / 60000,
+          success: false,
+          error: finalError,
+        });
+
+        throw new Error(finalError);
       }
     } else {
+      // Track unexpected error
+      await metrics.trackGemini({
+        model: currentModelName,
+        tokens_input: 0,
+        tokens_output: 0,
+        tokens_total: 0,
+        cost_usd: 0,
+        response_time_minutes: geminiErrorTime / 60000,
+        success: false,
+        error: errorMessage,
+      });
+
       throw error;
     }
   }
 
   const geminiTime = Date.now() - geminiStart;
   console.log(`[Gemini] Generation completed in ${geminiTime}ms`);
+
+  // Track comprehensive metrics
+  if (result) {
+    try {
+      const usageMetadata = result.response.usageMetadata;
+      const inputTokens = usageMetadata?.promptTokenCount || 0;
+      const outputTokens = usageMetadata?.candidatesTokenCount || 0;
+      const totalTokens =
+        usageMetadata?.totalTokenCount || inputTokens + outputTokens;
+
+      const costUSD = metrics.calculateGeminiCost(
+        currentModelName,
+        inputTokens,
+        outputTokens
+      );
+
+      await metrics.trackGemini({
+        model: currentModelName,
+        tokens_input: inputTokens,
+        tokens_output: outputTokens,
+        tokens_total: totalTokens,
+        cost_usd: costUSD,
+        response_time_minutes: geminiTime / 60000,
+        success: true,
+      });
+
+      console.log(
+        `[Gemini] Usage tracked - Tokens: ${totalTokens} (in: ${inputTokens}, out: ${outputTokens}), Cost: $${costUSD.toFixed(
+          6
+        )}`
+      );
+    } catch (metricsError) {
+      console.error("[Gemini] Failed to track metrics:", metricsError);
+    }
+  }
 
   const parsed = parseGeminiJson(text);
   console.log(`[Gemini] Parsed ${parsed.length} clip candidates from response`);
@@ -322,7 +393,7 @@ ${transcript}
       .map((c: any) => c.score)
       .filter((s: any) => s !== undefined);
     console.log(
-      `[Gemini] Score range: ${Math.min(...scores)} - ${Math.max(...scores)}`,
+      `[Gemini] Score range: ${Math.min(...scores)} - ${Math.max(...scores)}`
     );
   }
 
@@ -398,11 +469,11 @@ ${transcript}
 
   // Filter clips: valid duration, good score (>= 50), and basic validation
   const validClips = normalized.filter(
-    (clip) => isBasicValid(clip) && isDurationValid(clip) && hasGoodScore(clip),
+    (clip) => isBasicValid(clip) && isDurationValid(clip) && hasGoodScore(clip)
   );
 
   console.log(
-    `[Gemini] Filtered clips: ${normalized.length} -> ${validClips.length} (score >= 65)`,
+    `[Gemini] Filtered clips: ${normalized.length} -> ${validClips.length} (score >= 65)`
   );
 
   // Return all valid clips ranked from best to worst (as returned by Gemini)

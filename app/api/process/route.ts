@@ -6,14 +6,18 @@ import {
   type OutputLanguage,
 } from "../../../lib/gemini";
 import { loadPreferences, type QAPreferences } from "../../../lib/qaStore";
+import { metrics } from "../../../lib/services/MetricsService";
 
 export const runtime = "nodejs";
 
 // Accept FormData with audio file (client-side storage)
 export async function POST(request: Request) {
+  const jobId = `job-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  metrics.startJob(jobId);
+
   try {
     const startTime = Date.now();
-    console.log("[API] Starting process request");
+    console.log(`[API] Starting process request (Job ID: ${jobId})`);
 
     // Parse FormData
     const formData = await request.formData();
@@ -29,7 +33,7 @@ export async function POST(request: Request) {
     if (!audioFile) {
       return NextResponse.json(
         { error: "Missing audio file" },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -67,13 +71,13 @@ export async function POST(request: Request) {
     const segments = await transcribeAudioFromBuffer(audioBuffer);
     const transcriptionTime = Date.now() - transcriptionStart;
     console.log(
-      `[API] Transcription: ${transcriptionTime}ms (${segments.length} segments)`,
+      `[API] Transcription: ${transcriptionTime}ms (${segments.length} segments)`
     );
 
     if (segments.length === 0) {
       return NextResponse.json(
         { error: "Transcript was empty" },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -85,25 +89,40 @@ export async function POST(request: Request) {
     const clipCandidates = await generateClipCandidates(
       segments,
       mergedPreferences,
-      outputLanguage,
+      outputLanguage
     );
     const geminiTime = Date.now() - geminiStart;
     console.log(
-      `[API] Gemini analysis: ${geminiTime}ms (${clipCandidates.length} clips)`,
+      `[API] Gemini analysis: ${geminiTime}ms (${clipCandidates.length} clips)`
     );
 
     const totalTime = Date.now() - startTime;
     console.log(`[API] Total processing time: ${totalTime}ms`);
+
     if (clipCandidates.length === 0) {
+      await metrics.trackJobComplete(
+        jobId,
+        "video_processing",
+        false,
+        "No valid clip candidates"
+      );
       return NextResponse.json(
         { error: "Gemini did not return valid clip candidates" },
-        { status: 400 },
+        { status: 400 }
       );
     }
+
+    // Track successful job completion
+    await metrics.trackJobComplete(jobId, "video_processing", true);
+
     return NextResponse.json({ clips: clipCandidates, segments });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Processing failed";
+
+    // Track failed job
+    await metrics.trackJobComplete(jobId, "video_processing", false, message);
+
     const clientErrorMessages = [
       "Missing ELEVENLABS_API_KEY",
       "Missing GEMINI_API_KEY",
