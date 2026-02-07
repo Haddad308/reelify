@@ -186,57 +186,68 @@ export async function generateClipCandidates(
   const platformRec =
     platformRecommendations[platform] || platformRecommendations.instagram;
 
-  // Language-specific instructions for titles and tags
-  const outputLangInstructions =
-    outputLanguage === "en"
-      ? `
-OUTPUT LANGUAGE: English
-- Generate ALL titles, tags, and categories in ENGLISH.
-- Even if the transcript is in Arabic or another language, the output MUST be in English.
-- Use catchy, engaging English titles optimized for ${platform}.
-- Tags should be English keywords relevant to ${platform} discovery.
-`
-      : `
-OUTPUT LANGUAGE: Arabic
-- Generate ALL titles, tags, and categories in ARABIC.
-- Use SAME dialect/accent style as the transcript (e.g., Egyptian, Gulf, Levantine).
-- Keep titles natural, catchy, and reel-style optimized for ${platform}.
-- Do not translate or normalize style - match the speaker's dialect.
-`;
+  const outputLangInstructions = `
+      OUTPUT LANGUAGE RULE (CRITICAL):
+      - Detect the transcript language automatically.
+      - Generate ALL titles, tags, and categories in the SAME language as the transcript.
+      - If the transcript is Arabic:
+        - Use the SAME dialect/accent style as the speaker (e.g., Egyptian, Gulf, Levantine).
+        - Do NOT translate, normalize, or Modern-Standardize the language.
+      - If the transcript is English:
+        - Use natural, catchy, platform-optimized English.
+      - NEVER translate titles, tags, or categories into another language.
+      - Language consistency is mandatory.
+    `;
 
   // Optimized prompt asking for as many clips as possible with scores >= 65
   const prompt = `
-You are a professional short-form video editor specializing in ${platform} content.
-The following text is a timestamped transcript. Auto-detect its language AND dialect/accent style. Extract highlight segments of 30–90 seconds and rank best → worst.
+      You are a professional short-form video editor specializing in ${platform} content.
+      The following text is a timestamped transcript. Auto-detect its language AND dialect/accent style. Extract highlight segments of 30–90 seconds and rank best → worst.
 
-PLATFORM-SPECIFIC RECOMMENDATIONS:
-${platformRec}
-${outputLangInstructions}
+      PLATFORM-SPECIFIC RECOMMENDATIONS:
+      ${platformRec}
+      ${outputLangInstructions}
 
-Return ONLY valid JSON — no explanations.
-Format:
-[{"title":"...","start":0,"end":0,"category":"...","tags":["..."],"score":75}]
+      Return ONLY valid JSON — no explanations.
+      Format:
+      [{"title":"...","start":0,"end":0,"category":"...","tags":["..."],"score":75}]
 
-CRITICAL: Return ALL viable segments with score >= 65. Do NOT limit the number.
-Extract EVERY segment from the transcript that meets the quality threshold (score >= 65).
-There is NO maximum limit - return as many as you find.
-Sort descending by quality (best first, worst last).
+      CRITICAL:
+      - Return ONLY segments with score >= 65.
+      - Apply a DURATION-BASED UPPER LIMIT on the number of returned segments.
+      - The limit is an upper bound, NOT a target.
+      - If fewer segments meet the quality threshold, return fewer.
+      - NEVER include low-quality segments to reach the limit.
 
-Selection priority:
-1) Strong hook in first 3–5 seconds (critical for ${platform}).
-2) Clean sentence boundaries.
-3) Clear value/payoff.
-4) Smooth flow.
-5) ${platform}-specific engagement factors.
+      DURATION-BASED CAPS:
+      - ≤ 5 minutes video: max 2 segments
+      - 5–10 minutes video: max 3 segments
+      - 10–20 minutes video: max 5 segments
+      - 20–40 minutes video: max 7 segments
+      - 40–60 minutes video: max 10 segments
+      - 60+ minutes video: max 12 segments
 
-Scoring:
-- Score 0–100.
-- Internally rate hook (1–10) - especially important for ${platform}.
-- Rank by: hook → overall quality → value → ${platform} optimization.
+      SELECTION RULE:
+      - First extract ALL candidate segments with score >= 65.
+      - Then sort by score (descending).
+      - Return only the TOP N segments according to the duration-based cap.
+      Sort descending by quality (best first, worst last).
 
-${preferenceBlock}
-Transcript:
-${transcript}
+      Selection priority:
+      1) Strong hook in first 3–5 seconds (critical for ${platform}).
+      2) Clean sentence boundaries.
+      3) Clear value/payoff.
+      4) Smooth flow.
+      5) ${platform}-specific engagement factors.
+
+      Scoring:
+      - Score 0–100.
+      - Internally rate hook (1–10) - especially important for ${platform}.
+      - Rank by: hook → overall quality → value → ${platform} optimization.
+
+      ${preferenceBlock}
+      Transcript:
+      ${transcript}
   `.trim();
 
   const geminiStart = Date.now();
