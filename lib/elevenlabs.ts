@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { metrics } from "./services/MetricsService";
 
 export type TranscriptSegment = {
   start: number;
@@ -25,7 +26,7 @@ const normalizeTime = (value?: number) => {
 };
 
 const buildSegmentsFromWords = (
-  words: ElevenLabsWord[],
+  words: ElevenLabsWord[]
 ): TranscriptSegment[] => {
   const segments: TranscriptSegment[] = [];
   let currentWords: string[] = [];
@@ -67,7 +68,7 @@ const buildSegmentsFromWords = (
 
 // Transcribe audio from Buffer (no file system needed)
 export async function transcribeAudioFromBuffer(
-  audioBuffer: Buffer,
+  audioBuffer: Buffer
 ): Promise<TranscriptSegment[]> {
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) {
@@ -94,7 +95,7 @@ export async function transcribeAudioFromBuffer(
 
   const requestStart = Date.now();
   console.log(
-    `[ElevenLabs] Starting transcription request from buffer (${fileSizeMB}MB)`,
+    `[ElevenLabs] Starting transcription request from buffer (${fileSizeMB}MB)`
   );
 
   const response = await fetch(API_URL, {
@@ -107,38 +108,98 @@ export async function transcribeAudioFromBuffer(
 
   const requestTime = Date.now() - requestStart;
   console.log(
-    `[ElevenLabs] Transcription request completed in ${requestTime}ms`,
+    `[ElevenLabs] Transcription request completed in ${requestTime}ms`
   );
 
   if (!response.ok) {
     const details = await response.text();
-    throw new Error(`ElevenLabs STT failed: ${details}`);
+    const error = `ElevenLabs STT failed (${response.status}): ${details}`;
+
+    // Track API error
+    await metrics.trackApiError("elevenlabs", error, requestTime);
+    await metrics.trackElevenLabs({
+      model: modelId,
+      transcription_characters: 0,
+      cost_usd: 0,
+      response_time_minutes: requestTime / 60000,
+      success: false,
+      error,
+    });
+
+    throw new Error(error);
   }
 
-  const data = await response.json();
-  const words: ElevenLabsWord[] = Array.isArray(data?.words)
-    ? data.words
-    : Array.isArray(data?.word_timestamps)
+  try {
+    const data = await response.json();
+    const words: ElevenLabsWord[] = Array.isArray(data?.words)
+      ? data.words
+      : Array.isArray(data?.word_timestamps)
       ? data.word_timestamps
       : [];
 
-  const segments: TranscriptSegment[] = Array.isArray(data?.segments)
-    ? data.segments
-        .map((segment: any) => ({
-          start: normalizeTime(segment.start),
-          end: normalizeTime(segment.end),
-          text: String(segment.text ?? "").trim(),
-        }))
-        .filter((segment: TranscriptSegment) => segment.text)
-    : buildSegmentsFromWords(words);
+    const segments: TranscriptSegment[] = Array.isArray(data?.segments)
+      ? data.segments
+          .map((segment: any) => ({
+            start: normalizeTime(segment.start),
+            end: normalizeTime(segment.end),
+            text: String(segment.text ?? "").trim(),
+          }))
+          .filter((segment: TranscriptSegment) => segment.text)
+      : buildSegmentsFromWords(words);
 
-  return segments.filter((segment) => segment.text);
+    const filteredSegments = segments.filter((segment) => segment.text);
+
+    // Calculate comprehensive metrics
+    const totalCharacters = filteredSegments.reduce(
+      (sum, segment) => sum + segment.text.length,
+      0
+    );
+    const audioDuration = metrics.calculateAudioDuration(filteredSegments);
+    const costUSD = metrics.calculateElevenLabsCost(modelId, totalCharacters);
+
+    // Track comprehensive metrics
+    await metrics.trackElevenLabs({
+      model: modelId,
+      transcription_characters: totalCharacters,
+      audio_duration_minutes: audioDuration,
+      cost_usd: costUSD,
+      response_time_minutes: requestTime / 60000,
+      success: true,
+    });
+
+    console.log(
+      `[ElevenLabs] Usage tracked - Characters: ${totalCharacters}, Audio: ${audioDuration.toFixed(
+        2
+      )} min, Cost: $${costUSD.toFixed(6)}`
+    );
+
+    return filteredSegments;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Track parsing error
+    await metrics.trackApiError(
+      "elevenlabs",
+      `Parse error: ${errorMessage}`,
+      requestTime
+    );
+    await metrics.trackElevenLabs({
+      model: modelId,
+      transcription_characters: 0,
+      cost_usd: 0,
+      response_time_minutes: requestTime / 60000,
+      success: false,
+      error: `Parse error: ${errorMessage}`,
+    });
+
+    throw error;
+  }
 }
 
 // Transcribe from local file path (for backward compatibility)
 export async function transcribeAudioFromUrl(
   filePath: string,
-  originalUrl: string,
+  originalUrl: string
 ): Promise<TranscriptSegment[]> {
   // Read file into Buffer and use the buffer-based function
   const audioBuffer = await readFile(filePath);
@@ -148,7 +209,7 @@ export async function transcribeAudioFromUrl(
 // Keep original function for backward compatibility
 // Note: This function now uses transcribeAudioFromUrl which reads the file directly
 export async function transcribeAudio(
-  filePath: string,
+  filePath: string
 ): Promise<TranscriptSegment[]> {
   return transcribeAudioFromUrl(filePath, "");
 }

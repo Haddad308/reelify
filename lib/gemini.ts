@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { TranscriptSegment } from "./elevenlabs";
 import type { QAPreferences } from "./qaStore";
+import { metrics } from "./services/MetricsService";
 
 export type ClipCandidate = {
   title: string;
@@ -72,7 +73,7 @@ const parseGeminiJson = (raw: string): ClipCandidate[] => {
 export async function generateClipCandidates(
   segments: TranscriptSegment[],
   preferences?: QAPreferences,
-  outputLanguage: OutputLanguage = "ar",
+  outputLanguage: OutputLanguage = "ar"
 ): Promise<ClipCandidate[]> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -94,7 +95,7 @@ export async function generateClipCandidates(
     // Default to gemini-3-flash-preview (fastest and working)
     modelName = "gemini-3-flash-preview";
     console.log(
-      `[Gemini] Using default model: ${modelName} (fastest available)`,
+      `[Gemini] Using default model: ${modelName} (fastest available)`
     );
   }
 
@@ -106,7 +107,9 @@ export async function generateClipCandidates(
   const transcript = segments
     .map(
       (segment) =>
-        `[${segment.start.toFixed(2)} - ${segment.end.toFixed(2)}] ${segment.text}`,
+        `[${segment.start.toFixed(2)} - ${segment.end.toFixed(2)}] ${
+          segment.text
+        }`
     )
     .join("\n");
 
@@ -183,62 +186,73 @@ export async function generateClipCandidates(
   const platformRec =
     platformRecommendations[platform] || platformRecommendations.instagram;
 
-  // Language-specific instructions for titles and tags
-  const outputLangInstructions =
-    outputLanguage === "en"
-      ? `
-OUTPUT LANGUAGE: English
-- Generate ALL titles, tags, and categories in ENGLISH.
-- Even if the transcript is in Arabic or another language, the output MUST be in English.
-- Use catchy, engaging English titles optimized for ${platform}.
-- Tags should be English keywords relevant to ${platform} discovery.
-`
-      : `
-OUTPUT LANGUAGE: Arabic
-- Generate ALL titles, tags, and categories in ARABIC.
-- Use SAME dialect/accent style as the transcript (e.g., Egyptian, Gulf, Levantine).
-- Keep titles natural, catchy, and reel-style optimized for ${platform}.
-- Do not translate or normalize style - match the speaker's dialect.
-`;
+  const outputLangInstructions = `
+      OUTPUT LANGUAGE RULE (CRITICAL):
+      - Detect the transcript language automatically.
+      - Generate ALL titles, tags, and categories in the SAME language as the transcript.
+      - If the transcript is Arabic:
+        - Use the SAME dialect/accent style as the speaker (e.g., Egyptian, Gulf, Levantine).
+        - Do NOT translate, normalize, or Modern-Standardize the language.
+      - If the transcript is English:
+        - Use natural, catchy, platform-optimized English.
+      - NEVER translate titles, tags, or categories into another language.
+      - Language consistency is mandatory.
+    `;
 
   // Optimized prompt asking for as many clips as possible with scores >= 65
   const prompt = `
-You are a professional short-form video editor specializing in ${platform} content.
-The following text is a timestamped transcript. Auto-detect its language AND dialect/accent style. Extract highlight segments of 30–90 seconds and rank best → worst.
+      You are a professional short-form video editor specializing in ${platform} content.
+      The following text is a timestamped transcript. Auto-detect its language AND dialect/accent style. Extract highlight segments of 30–90 seconds and rank best → worst.
 
-PLATFORM-SPECIFIC RECOMMENDATIONS:
-${platformRec}
-${outputLangInstructions}
+      PLATFORM-SPECIFIC RECOMMENDATIONS:
+      ${platformRec}
+      ${outputLangInstructions}
 
-Return ONLY valid JSON — no explanations.
-Format:
-[{"title":"...","start":0,"end":0,"category":"...","tags":["..."],"score":75}]
+      Return ONLY valid JSON — no explanations.
+      Format:
+      [{"title":"...","start":0,"end":0,"category":"...","tags":["..."],"score":75}]
 
-CRITICAL: Return ALL viable segments with score >= 65. Do NOT limit the number.
-Extract EVERY segment from the transcript that meets the quality threshold (score >= 65).
-There is NO maximum limit - return as many as you find.
-Sort descending by quality (best first, worst last).
+      CRITICAL:
+      - Return ONLY segments with score >= 65.
+      - Apply a DURATION-BASED UPPER LIMIT on the number of returned segments.
+      - The limit is an upper bound, NOT a target.
+      - If fewer segments meet the quality threshold, return fewer.
+      - NEVER include low-quality segments to reach the limit.
 
-Selection priority:
-1) Strong hook in first 3–5 seconds (critical for ${platform}).
-2) Clean sentence boundaries.
-3) Clear value/payoff.
-4) Smooth flow.
-5) ${platform}-specific engagement factors.
+      DURATION-BASED CAPS:
+      - ≤ 5 minutes video: max 2 segments
+      - 5–10 minutes video: max 3 segments
+      - 10–20 minutes video: max 5 segments
+      - 20–40 minutes video: max 7 segments
+      - 40–60 minutes video: max 10 segments
+      - 60+ minutes video: max 12 segments
 
-Scoring:
-- Score 0–100.
-- Internally rate hook (1–10) - especially important for ${platform}.
-- Rank by: hook → overall quality → value → ${platform} optimization.
+      SELECTION RULE:
+      - First extract ALL candidate segments with score >= 65.
+      - Then sort by score (descending).
+      - Return only the TOP N segments according to the duration-based cap.
+      Sort descending by quality (best first, worst last).
 
-${preferenceBlock}
-Transcript:
-${transcript}
+      Selection priority:
+      1) Strong hook in first 3–5 seconds (critical for ${platform}).
+      2) Clean sentence boundaries.
+      3) Clear value/payoff.
+      4) Smooth flow.
+      5) ${platform}-specific engagement factors.
+
+      Scoring:
+      - Score 0–100.
+      - Internally rate hook (1–10) - especially important for ${platform}.
+      - Rank by: hook → overall quality → value → ${platform} optimization.
+
+      ${preferenceBlock}
+      Transcript:
+      ${transcript}
   `.trim();
 
   const geminiStart = Date.now();
   console.log(
-    `[Gemini] Starting clip generation (${segments.length} segments, ${transcript.length} chars)`,
+    `[Gemini] Starting clip generation (${segments.length} segments, ${transcript.length} chars)`
   );
 
   let result;
@@ -265,13 +279,19 @@ ${transcript}
     });
     text = result.response.text();
   } catch (error: unknown) {
+    const geminiErrorTime = Date.now() - geminiStart;
+
+    // Track API error
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await metrics.trackApiError("gemini", errorMessage, geminiErrorTime);
+
     // If model fails with 404, try fallback models in order
     if (
       error instanceof Error &&
       (error.message.includes("404") || error.message.includes("not found"))
     ) {
       console.warn(
-        `[Gemini] Model ${currentModelName} not available, trying fallback models...`,
+        `[Gemini] Model ${currentModelName} not available, trying fallback models...`
       );
 
       for (const fallbackModelName of fallbackModels) {
@@ -287,13 +307,14 @@ ${transcript}
             generationConfig,
           });
           text = result.response.text();
+          currentModelName = fallbackModelName;
           console.log(
-            `[Gemini] Successfully used fallback model: ${fallbackModelName}`,
+            `[Gemini] Successfully used fallback model: ${fallbackModelName}`
           );
           break;
         } catch (fallbackError) {
           console.warn(
-            `[Gemini] Fallback model ${fallbackModelName} also failed, trying next...`,
+            `[Gemini] Fallback model ${fallbackModelName} also failed, trying next...`
           );
           continue;
         }
@@ -301,17 +322,78 @@ ${transcript}
 
       // If all fallbacks failed, throw original error
       if (!text) {
-        throw new Error(
-          `All Gemini models failed. Tried: ${currentModelName}, ${fallbackModels.join(", ")}. Error: ${error.message}`,
-        );
+        const finalError = `All Gemini models failed. Tried: ${currentModelName}, ${fallbackModels.join(
+          ", "
+        )}. Error: ${error.message}`;
+
+        // Track final failure
+        await metrics.trackGemini({
+          model: currentModelName,
+          tokens_input: 0,
+          tokens_output: 0,
+          tokens_total: 0,
+          cost_usd: 0,
+          response_time_minutes: geminiErrorTime / 60000,
+          success: false,
+          error: finalError,
+        });
+
+        throw new Error(finalError);
       }
     } else {
+      // Track unexpected error
+      await metrics.trackGemini({
+        model: currentModelName,
+        tokens_input: 0,
+        tokens_output: 0,
+        tokens_total: 0,
+        cost_usd: 0,
+        response_time_minutes: geminiErrorTime / 60000,
+        success: false,
+        error: errorMessage,
+      });
+
       throw error;
     }
   }
 
   const geminiTime = Date.now() - geminiStart;
   console.log(`[Gemini] Generation completed in ${geminiTime}ms`);
+
+  // Track comprehensive metrics
+  if (result) {
+    try {
+      const usageMetadata = result.response.usageMetadata;
+      const inputTokens = usageMetadata?.promptTokenCount || 0;
+      const outputTokens = usageMetadata?.candidatesTokenCount || 0;
+      const totalTokens =
+        usageMetadata?.totalTokenCount || inputTokens + outputTokens;
+
+      const costUSD = metrics.calculateGeminiCost(
+        currentModelName,
+        inputTokens,
+        outputTokens
+      );
+
+      await metrics.trackGemini({
+        model: currentModelName,
+        tokens_input: inputTokens,
+        tokens_output: outputTokens,
+        tokens_total: totalTokens,
+        cost_usd: costUSD,
+        response_time_minutes: geminiTime / 60000,
+        success: true,
+      });
+
+      console.log(
+        `[Gemini] Usage tracked - Tokens: ${totalTokens} (in: ${inputTokens}, out: ${outputTokens}), Cost: $${costUSD.toFixed(
+          6
+        )}`
+      );
+    } catch (metricsError) {
+      console.error("[Gemini] Failed to track metrics:", metricsError);
+    }
+  }
 
   const parsed = parseGeminiJson(text);
   console.log(`[Gemini] Parsed ${parsed.length} clip candidates from response`);
@@ -322,7 +404,7 @@ ${transcript}
       .map((c: any) => c.score)
       .filter((s: any) => s !== undefined);
     console.log(
-      `[Gemini] Score range: ${Math.min(...scores)} - ${Math.max(...scores)}`,
+      `[Gemini] Score range: ${Math.min(...scores)} - ${Math.max(...scores)}`
     );
   }
 
@@ -398,11 +480,11 @@ ${transcript}
 
   // Filter clips: valid duration, good score (>= 50), and basic validation
   const validClips = normalized.filter(
-    (clip) => isBasicValid(clip) && isDurationValid(clip) && hasGoodScore(clip),
+    (clip) => isBasicValid(clip) && isDurationValid(clip) && hasGoodScore(clip)
   );
 
   console.log(
-    `[Gemini] Filtered clips: ${normalized.length} -> ${validClips.length} (score >= 65)`,
+    `[Gemini] Filtered clips: ${normalized.length} -> ${validClips.length} (score >= 65)`
   );
 
   // Return all valid clips ranked from best to worst (as returned by Gemini)
